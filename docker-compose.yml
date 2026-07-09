@@ -1,0 +1,51 @@
+# Local development backing services for Lagash / orbita.
+#
+# The app reaches Postgres through Neon's HTTP serverless driver (neon-http),
+# not the raw Postgres wire protocol — so a plain Postgres container isn't
+# enough on its own. `neon-proxy` (local-neon-http-proxy) exposes a
+# Neon-compatible SQL-over-HTTP endpoint on :4444 and forwards to `postgres`.
+# drizzle-kit (migrate / studio) speaks the wire protocol, so it talks to
+# Postgres directly on the host port. One DATABASE_URL serves both — see
+# .env.example and README.
+#
+# Quick start (from the repo root):
+#   pnpm dev:setup     # up + wait + migrate + seed + dev test users (one shot)
+#   pnpm dev           # run the app on the host (best HMR)
+# Manual:
+#   pnpm db:up / pnpm db:down / pnpm db:reset   (reset wipes the data volume)
+#
+# Port conflict? If you already run Postgres on 5432, set POSTGRES_PORT in .env
+# (e.g. POSTGRES_PORT=5433) and match the port in DATABASE_URL. The proxy always
+# reaches Postgres over the internal docker network, so only the host port moves.
+services:
+  postgres:
+    image: postgres:17-alpine # Neon runs Postgres 17 — keep in sync for parity.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: main
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d main']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  neon-proxy:
+    image: ghcr.io/timowilhelm/local-neon-http-proxy:main
+    restart: unless-stopped
+    environment:
+      # Internal docker-network connection (not the host port) — always 5432.
+      PG_CONNECTION_STRING: postgres://postgres:postgres@postgres:5432/main
+    ports:
+      - '4444:4444'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
