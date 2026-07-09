@@ -15,12 +15,100 @@ Durable context for humans and AI agents working on this repo. Keep this current
 
 ## What this is
 
-A **blank TanStack Start** application (React). No feature scaffolding, no extra
-partner integrations — the intentionally minimal starter. Located at the repo
-root (`/home/archie/projects/orbita`); the app was scaffolded as `my-tanstack-app`
-and then relocated to the root, and the package renamed to `orbita`.
+Repo root `/home/archie/projects/orbita` (package `orbita`). It started as a
+**blank TanStack Start** (React) scaffold and now hosts **Lagash VTT** — a
+companion web app for the tabletop RPG *"Lagash: Crônica do Grande Eclipse"*
+(a modified Cthulhu Dark game). The scaffold/deploy history is below; the
+application architecture is in the next section.
 
-## How it was scaffolded
+## Lagash VTT — application
+
+Single-table companion app (1 GM + 5 players, no multi-tenant). Replaces paper
+sheets and physical props with live-synced digital equivalents. **All UI copy is
+pt-BR; code/identifiers stay English.**
+
+**Stack ($0 / OSS, self-hostable):** **Neon** serverless Postgres via **Drizzle
+ORM**; **Auth.js** (`@auth/core`) self-hosted magic-link auth with the Drizzle
+adapter; **SSE** for live sync; **Resend** free tier as the *only* non-OSS piece,
+used purely as mail transport behind the swappable `src/lib/mail.ts`. (Migrated
+off Supabase — see the history note at the end of this section.) Skills consulted:
+`router-core/auth-and-guards`, `start-core/server-functions`,
+`start-core/execution-model`, `start-core/deployment`.
+
+**Data model** (`src/server/db/schema.ts`, migrations in `drizzle/`):
+- Auth.js adapter tables: `users` (role gm|player), `accounts`, `sessions`,
+  `verification_tokens`. `invited_users` = email allowlist → role + `character_slug`;
+  provisioning happens in the Auth.js `createUser` event (role + PC ownership).
+- `characters` (public sheet fields + `insight` 0–6 + `insight_locked_at`;
+  `owner_user_id` → users).
+- `character_gm_notes` (**Atrito** — separate GM-only table, unreachable by players).
+- `six_suns_state` (singleton row, `suns boolean[6]`), `legacy_entries`
+  (list, status secured|threatened|lost).
+- A `set_updated_at` trigger (`drizzle/0001`) bumps `updated_at` on the three
+  shared tables — the SSE change feed polls `max(updated_at)` off it.
+
+**Permissions (app-layer authz — RLS is gone):** Neon has no row-level security,
+so every old RLS policy lives in `src/server/data.core.ts`: cores take an explicit
+`AuthUser`; GM reads/writes everything (`assertGm`); a player is scoped to their
+own `characters` row by `character_slug`; shared tracks are read-only for players,
+GM-writable; Atrito is GM-only. Mutations return `{ok:false}` (0 rows) on an
+unauthorized target — the silent-denial equivalent. Route guards (`beforeLoad`)
+are UX; the data boundary is these cores.
+
+**Auth (Auth.js, self-hosted):** no TanStack adapter exists, so `@auth/core` is
+mounted as a **global request middleware in `src/start.ts`** that delegates
+`/api/auth/*` to `Auth(request, authConfig)`. Config in `src/server/auth/config.ts`
+(`basePath: '/api/auth'`, database sessions, Drizzle adapter, Resend provider with
+`sendVerificationRequest` routed through `src/lib/mail.ts`; allowlist gate in the
+`signIn` callback + provider). `@auth/core` + Neon are dynamically imported inside
+the middleware `.server()` body so they never enter the client bundle. Identity
+seam = `src/server/session.ts` (`getCurrentUser`/`requireUser`/`requireGm`).
+
+**Routes:** `/login` (POST `/api/auth/signin/resend` for the magic link — no
+confirm page; Auth.js owns the callback at `/api/auth/callback/resend`), `_app`
+(auth layout, resolves user into context), `_app/` = `/` (player: own sheet + live
+tracks; GM redirected), `_app/gm` = `/gm` (GM dashboard: all sheets + Atrito + Six
+Suns + Legacy + Insight-6 **sacrifice** prompt).
+
+**Realtime (SSE):** `src/server/events.ts` serves a bounded (~50s) `text/event-stream`
+at `/api/events` (mounted in `src/start.ts`) that polls `max(updated_at)` across
+the three shared tables every 2s (Neon's HTTP driver can't do LISTEN/NOTIFY) and
+emits `{changed:true}`. Client `src/lib/realtime.ts#useLagashRealtime()` opens an
+`EventSource` → `router.invalidate()` on each signal; the browser auto-reconnects
+after the bounded window.
+
+**Server functions:** `src/server/auth.ts` (`fetchCurrentUser`), `src/server/data.ts`
+(thin `createServerFn` wrappers) over `src/server/data.core.ts` (server-only cores +
+Drizzle access). Neon client in `src/server/db/client.ts` (marked `server-only`).
+
+**Decisions locked with the user:** player self-edits own Insight (GM overrides);
+players see **only their own** sheet (not peers'); devices = phone (players) +
+desktop (GM) — player views phone-first, GM dashboard desktop-first.
+
+**Env:** `DATABASE_URL` (Neon), `AUTH_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`
+(all server-only, no `VITE_` prefix). Without `AUTH_SECRET` the app degrades to
+the login screen. Drizzle scripts: `pnpm db:generate|migrate|push|studio|seed`.
+
+**Gotchas:**
+- Server-only modules (Neon, `@auth/core`, `events.ts`) must never reach the
+  client bundle — keep them in `server-only`-marked files and reference them only
+  inside server-fn / middleware `.server()` bodies (dynamic import in `start.ts`).
+  The build's import-protection plugin fails otherwise.
+- Auth.js `@auth/core` defaults `basePath` to `/auth`; we set `/api/auth` in
+  `authConfig` **and** pass it as the 5th arg to `createActionURL`.
+- 4 of 5 sheets are pt-BR placeholders pending real content (Halda is real).
+
+**Next steps:** (1) set real `AUTH_SECRET`/`RESEND_API_KEY`/`EMAIL_FROM` in `.env`
++ Vercel, seed `invited_users` with the GM + 5 player emails, confirm real email
+delivery; (2) drop in the 4 remaining sheets' real text; (3) optional dice roller.
+
+**History:** originally built on Supabase (auth + Postgres + Realtime + RLS);
+migrated to the Neon/Drizzle/Auth.js/SSE/Resend stack above to run at $0 on
+OSS/self-hostable infra. RLS moved to app-layer authz; Realtime moved to SSE.
+
+---
+
+## How the host project was scaffolded / deployed
 
 Exact TanStack CLI command used:
 
