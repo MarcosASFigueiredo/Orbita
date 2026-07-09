@@ -14,9 +14,12 @@ import {
   legacyEntries,
   sixSunsState,
 } from './schema'
+import { configureNeonForLocalDev } from './neon-local'
 
 const connectionString = process.env.DATABASE_URL
 if (!connectionString) throw new Error('DATABASE_URL is not set')
+// No-op against real Neon; redirects to the local docker proxy in dev.
+configureNeonForLocalDev(connectionString)
 const db = drizzle(neon(connectionString), {
   schema: { characterGmNotes, characters, legacyEntries, sixSunsState },
 })

@@ -1,13 +1,85 @@
-Welcome to your new TanStack Start app! 
+# Lagash VTT (orbita)
 
-# Getting Started
+Companion web app for the tabletop RPG *"Lagash: Crônica do Grande Eclipse"*.
+Stack: React 19 + TanStack Start, Postgres via Drizzle ORM, self-hosted Auth.js
+magic-link auth, SSE realtime. Production runs on Neon + Resend; local dev runs
+entirely on Docker with **no external accounts and no internet required**.
 
-To run this application:
+# Getting Started (local development, from zero)
+
+Prerequisites: **Node + pnpm**, and **Docker** (Docker Desktop with WSL
+integration enabled if you're on Windows/WSL). Then:
 
 ```bash
+# 1. Install dependencies
 pnpm install
-pnpm dev
+
+# 2. Create your local env file (defaults already point at the docker DB)
+cp .env.example .env
+
+# 3. Bring up the database and set everything up from scratch:
+#    starts Postgres + the Neon HTTP proxy, runs migrations, seeds the
+#    characters + shared tracks, and seeds two local test users.
+pnpm dev:setup
+
+# 4. Run the app
+pnpm dev            # http://localhost:3000
 ```
+
+### Logging in locally (no email needed)
+
+Auth is passwordless magic-link. Locally there's no mail provider, so the link
+is **printed to the terminal running `pnpm dev`** instead of being emailed.
+
+1. Go to `http://localhost:3000/login` and enter a seeded test email:
+   - `gm@lagash.local` — the **GM** (dashboard at `/gm`)
+   - `player@lagash.local` — a **Player** bound to the *Halda* sheet
+2. Look in the `pnpm dev` terminal for a line like
+   `✉️  [dev] Magic link for gm@lagash.local: http://localhost:3000/api/auth/callback/...`
+3. Paste that URL into the browser — you're signed in.
+
+Only allowlisted emails may sign in (`invited_users` table). Add more via
+`pnpm db:studio` or by editing `src/server/db/seed-dev.ts`.
+
+### Why a "Neon proxy" container?
+
+In production the app talks to Postgres through Neon's **HTTP** serverless
+driver, not the raw wire protocol — a plain Postgres container can't serve that.
+`docker-compose.yml` therefore runs a tiny `neon-proxy` alongside Postgres that
+exposes a Neon-compatible HTTP endpoint on `:4444`, so your **local code path is
+identical to production** (same driver, no code branches). `src/server/db/
+neon-local.ts` redirects the driver to that proxy only when `DATABASE_URL` points
+at the local host — against real Neon it's a no-op.
+
+### Local vs production — don't mix them up
+
+The **only** thing that decides local vs production is the `DATABASE_URL` value
+in your `.env`:
+
+| | `DATABASE_URL` | Email | Notes |
+|---|---|---|---|
+| **Local** | `postgres://…@db.localtest.me:5432/main` (default in `.env.example`) | magic link printed to terminal | safe to migrate/seed/reset freely |
+| **Production** | your Neon connection string | Resend (`RESEND_API_KEY`) | **never** run `db:migrate`/`db:seed` against it unless you mean to |
+
+`.env` is gitignored; only `.env.example` (placeholders, no secrets) is
+committed. `pnpm db:seed:dev` hard-refuses to run unless `DATABASE_URL` is the
+local host, so a stray reset can't touch Neon.
+
+### Handy commands
+
+```bash
+pnpm db:up        # start Postgres + Neon proxy (waits until healthy)
+pnpm db:down      # stop the containers (keeps data)
+pnpm db:reset     # wipe the data volume and start fresh
+pnpm db:migrate   # apply drizzle/ migrations
+pnpm db:seed      # characters + shared tracks
+pnpm db:seed:dev  # local GM + Player test users (local-only)
+pnpm db:studio    # Drizzle Studio (browse/edit the DB)
+```
+
+Port 5432 already taken? Set `POSTGRES_PORT` in `.env` (e.g. `5433`) and change
+the `:5432` in `DATABASE_URL` to match. If `db.localtest.me` doesn't resolve
+(offline DNS), add `127.0.0.1 db.localtest.me` to your hosts file.
 
 # Building For Production
 

@@ -18,7 +18,16 @@ export async function sendMagicLinkEmail({
   from,
 }: MagicLinkMail): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
-  if (!apiKey) throw new Error('RESEND_API_KEY is not set')
+  if (!apiKey) {
+    // Local-dev convenience: with no mail provider configured, print the magic
+    // link to the server console so you can sign in offline without sending
+    // real email. In production a missing key is a misconfiguration — fail loud.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(`\n✉️  [dev] Magic link for ${to}:\n   ${url}\n`)
+      return
+    }
+    throw new Error('RESEND_API_KEY is not set')
+  }
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
