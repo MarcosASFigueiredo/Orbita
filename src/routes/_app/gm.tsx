@@ -1,11 +1,12 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { TriangleAlert } from "lucide-react";
-import { AppBar } from "#/components/lagash/AppBar";
-import { CharacterSheet } from "#/components/lagash/CharacterSheet";
+import { CharacterDetail } from "#/components/lagash/CharacterDetail";
 import { LegacyTrack } from "#/components/lagash/LegacyTrack";
-import { SixSuns } from "#/components/lagash/SixSuns";
+import { Roster } from "#/components/lagash/Roster";
+import { SunsClock } from "#/components/lagash/SunsClock";
 import { useLagashRealtime } from "#/lib/realtime";
+import { useOptimisticData } from "#/lib/optimistic";
 import {
   addLegacyEntry,
   deleteLegacyEntry,
@@ -20,6 +21,7 @@ import {
 import type {
   CharacterRow,
   CharacterSheetFields,
+  LegacyEntryRow,
   LegacyStatus,
 } from "#/lib/game";
 
@@ -33,91 +35,176 @@ export const Route = createFileRoute("/_app/gm")({
   component: GmDashboard,
 });
 
+// A placeholder Legacy row shown instantly on add; the SSE refetch swaps it for
+// the real DB row (with its real id) within ~1s.
+function tempLegacy(texto: string, position: number): LegacyEntryRow {
+  const now = new Date().toISOString();
+  return {
+    id: `temp-${now}-${Math.random().toString(36).slice(2)}`,
+    texto,
+    status: "secured",
+    position,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
 function GmDashboard() {
-  const { characters, atrito, suns, legacy } = Route.useLoaderData();
-  const router = useRouter();
+  const [data, mutate] = useOptimisticData(Route.useLoaderData());
+  const { characters, atrito, suns, legacy } = data;
+  const [picked, setPicked] = useState<string | null>(null);
   useLagashRealtime();
 
-  const refresh = () => router.invalidate();
+  // Default the detail pane to the first character; keep the caller's pick when
+  // it still exists (survives realtime list changes).
+  const selected =
+    characters.find((c) => c.id === picked) ?? characters[0] ?? null;
 
-  const onToggleSun = (index: number) => {
-    const next = Array.from({ length: 6 }, (_, i) =>
-      i === index ? !suns[i] : suns[i],
+  const onSetSuns = (next: boolean[]) =>
+    mutate(
+      (d) => ({ ...d, suns: next }),
+      () => setSuns({ data: { suns: next } }),
     );
-    void setSuns({ data: { suns: next } }).then(refresh);
-  };
+
+  const onSaveField = (
+    id: string,
+    field: keyof CharacterSheetFields,
+    value: string,
+  ) =>
+    mutate(
+      (d) => ({
+        ...d,
+        characters: d.characters.map((c) =>
+          c.id === id ? { ...c, [field]: value } : c,
+        ),
+      }),
+      () => updateCharacterFields({ data: { id, fields: { [field]: value } } }),
+    );
+
+  const onInsight = (id: string, value: number) =>
+    mutate(
+      (d) => ({
+        ...d,
+        characters: d.characters.map((c) =>
+          c.id === id ? { ...c, insight: value } : c,
+        ),
+      }),
+      () => updateInsight({ data: { id, insight: value } }),
+    );
+
+  const onSaveAtrito = (id: string, value: string) =>
+    mutate(
+      (d) => ({ ...d, atrito: { ...d.atrito, [id]: value } }),
+      () => updateAtrito({ data: { characterId: id, atrito: value } }),
+    );
+
+  const onAddLegacy = (texto: string) =>
+    mutate(
+      (d) => ({ ...d, legacy: [...d.legacy, tempLegacy(texto, d.legacy.length)] }),
+      () => addLegacyEntry({ data: { texto, position: legacy.length } }),
+    );
+
+  const onSetLegacyStatus = (id: string, status: LegacyStatus) =>
+    mutate(
+      (d) => ({
+        ...d,
+        legacy: d.legacy.map((e) => (e.id === id ? { ...e, status } : e)),
+      }),
+      () => updateLegacyEntry({ data: { id, status } }),
+    );
+
+  const onEditLegacyText = (id: string, texto: string) =>
+    mutate(
+      (d) => ({
+        ...d,
+        legacy: d.legacy.map((e) => (e.id === id ? { ...e, texto } : e)),
+      }),
+      () => updateLegacyEntry({ data: { id, texto } }),
+    );
+
+  const onDeleteLegacy = (id: string) =>
+    mutate(
+      (d) => ({ ...d, legacy: d.legacy.filter((e) => e.id !== id) }),
+      () => deleteLegacyEntry({ data: { id } }),
+    );
+
+  // Lock the PC (and optionally record a final Legacy entry) at Insight 6.
+  const onSacrifice = (character: CharacterRow, texto: string | null) =>
+    mutate(
+      (d) => ({
+        ...d,
+        legacy: texto ? [...d.legacy, tempLegacy(texto, d.legacy.length)] : d.legacy,
+        characters: d.characters.map((c) =>
+          c.id === character.id
+            ? { ...c, insight_locked_at: new Date().toISOString() }
+            : c,
+        ),
+      }),
+      async () => {
+        if (texto) await addLegacyEntry({ data: { texto, status: "secured" } });
+        await lockCharacter({ data: { id: character.id, locked: true } });
+      },
+    );
 
   const pendingSacrifice = characters.filter(
     (c) => c.insight >= 6 && c.insight_locked_at === null,
   );
 
   return (
-    <main className="mx-auto max-w-[1400px] px-4 py-6">
-      <AppBar subtitle="Painel do Mestre" />
+    <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-9">
+      <p className="plate-title mb-6">
+        <span className="glyph">✦</span>Painel do Mestre
+      </p>
 
       {pendingSacrifice.length > 0 && (
         <div className="mb-6 flex flex-col gap-3">
           {pendingSacrifice.map((c) => (
-            <SacrificePrompt key={c.id} character={c} onDone={refresh} />
+            <SacrificePrompt
+              key={c.id}
+              character={c}
+              onCommit={(texto) => onSacrifice(c, texto)}
+            />
           ))}
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="grid gap-6 lg:grid-cols-2">
-          {characters.map((c) => (
-            <CharacterSheet
-              key={c.id}
-              character={c}
-              editable
-              compact
-              locked={c.insight_locked_at !== null}
-              onSaveField={(field: keyof CharacterSheetFields, value: string) =>
-                void updateCharacterFields({
-                  data: { id: c.id, fields: { [field]: value } },
-                }).then(refresh)
-              }
-              insightEditable
-              onInsightChange={(value: number) =>
-                void updateInsight({ data: { id: c.id, insight: value } }).then(
-                  refresh,
-                )
-              }
-              atrito={atrito[c.id] ?? ""}
-              onSaveAtrito={(value: string) =>
-                void updateAtrito({
-                  data: { characterId: c.id, atrito: value },
-                }).then(refresh)
-              }
-            />
-          ))}
-        </div>
+      <div className="grid items-start gap-5 min-[1150px]:grid-cols-[288px_1fr_320px]">
+        <Roster
+          characters={characters}
+          selectedId={selected?.id ?? null}
+          onSelect={setPicked}
+        />
 
-        <aside className="flex flex-col gap-6 xl:sticky xl:top-6 xl:self-start">
-          <section className="panel p-5">
-            <SixSuns suns={suns} editable onToggle={onToggleSun} />
+        {selected ? (
+          <CharacterDetail
+            character={selected}
+            atrito={atrito[selected.id] ?? ""}
+            locked={selected.insight_locked_at !== null}
+            onSaveField={(field, value) => onSaveField(selected.id, field, value)}
+            onInsight={(value) => onInsight(selected.id, value)}
+            onSaveAtrito={(value) => onSaveAtrito(selected.id, value)}
+          />
+        ) : (
+          <div className="plate p-6 text-center font-serif italic text-[var(--color-text-3)]">
+            Nenhum personagem na crônica ainda.
+          </div>
+        )}
+
+        <div className="flex flex-col gap-5">
+          <section className="plate reveal reveal-d2 tiltable p-6">
+            <SunsClock suns={suns} editable onChange={onSetSuns} />
           </section>
-          <section className="panel p-5">
+          <section className="plate reveal reveal-d3 tiltable p-6">
             <LegacyTrack
               entries={legacy}
               editable
-              onAdd={(texto) =>
-                void addLegacyEntry({
-                  data: { texto, position: legacy.length },
-                }).then(refresh)
-              }
-              onSetStatus={(id: string, status: LegacyStatus) =>
-                void updateLegacyEntry({ data: { id, status } }).then(refresh)
-              }
-              onEditText={(id: string, texto: string) =>
-                void updateLegacyEntry({ data: { id, texto } }).then(refresh)
-              }
-              onDelete={(id: string) =>
-                void deleteLegacyEntry({ data: { id } }).then(refresh)
-              }
+              onAdd={onAddLegacy}
+              onSetStatus={onSetLegacyStatus}
+              onEditText={onEditLegacyText}
+              onDelete={onDeleteLegacy}
             />
           </section>
-        </aside>
+        </div>
       </div>
     </main>
   );
@@ -127,34 +214,28 @@ function GmDashboard() {
 // lock one entry into the Legacy Track before the character is lost.
 function SacrificePrompt({
   character,
-  onDone,
+  onCommit,
 }: {
   character: CharacterRow;
-  onDone: () => void;
+  onCommit: (texto: string | null) => void;
 }) {
   const [texto, setTexto] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const commit = async (withEntry: boolean) => {
+  const commit = (withEntry: boolean) => {
     setBusy(true);
-    if (withEntry && texto.trim()) {
-      await addLegacyEntry({
-        data: { texto: texto.trim(), status: "secured" },
-      });
-    }
-    await lockCharacter({ data: { id: character.id, locked: true } });
-    onDone();
+    onCommit(withEntry && texto.trim() ? texto.trim() : null);
   };
 
   return (
-    <div className="panel border-[var(--color-dread-deep)] p-4">
-      <div className="mb-3 flex items-center gap-2 text-[var(--color-dread)]">
+    <div className="plate border-[var(--color-crimson-deep)] p-4">
+      <div className="mb-3 flex items-center gap-2 text-[var(--color-crimson)]">
         <TriangleAlert size={18} />
-        <p className="font-semibold">
+        <p className="font-serif text-lg font-medium">
           {character.nome} chegou ao Insight 6 — o último momento lúcido.
         </p>
       </div>
-      <p className="mb-3 text-sm text-[var(--color-mist)]">
+      <p className="mb-3 text-sm text-[var(--color-text-2)]">
         Grave uma última coisa na Trilha do Legado antes de {character.nome} se
         perder.
       </p>

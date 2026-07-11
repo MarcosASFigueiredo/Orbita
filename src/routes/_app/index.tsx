@@ -1,15 +1,11 @@
-import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
-import { AppBar } from "#/components/lagash/AppBar";
-import { CharacterSheet } from "#/components/lagash/CharacterSheet";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { Codex } from "#/components/lagash/Codex";
 import { LegacyTrack } from "#/components/lagash/LegacyTrack";
-import { SixSuns } from "#/components/lagash/SixSuns";
+import { MobileDock } from "#/components/lagash/MobileDock";
+import { SunsClock } from "#/components/lagash/SunsClock";
 import { useLagashRealtime } from "#/lib/realtime";
-import {
-  fetchPlayerHome,
-  updateCharacterFields,
-  updateInsight,
-} from "#/server/data";
-import type { CharacterSheetFields } from "#/lib/game";
+import { useOptimisticData } from "#/lib/optimistic";
+import { fetchPlayerHome, updateInsight } from "#/server/data";
 
 export const Route = createFileRoute("/_app/")({
   beforeLoad: ({ context }) => {
@@ -22,55 +18,51 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function PlayerHome() {
-  const { character, suns, legacy } = Route.useLoaderData();
-  const { user } = Route.useRouteContext();
-  const router = useRouter();
+  const [data, mutate] = useOptimisticData(Route.useLoaderData());
+  const { character, suns, legacy } = data;
   useLagashRealtime();
 
   if (!character) {
     return (
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <AppBar subtitle={user.displayName} />
-        <p className="panel p-6 text-[var(--color-mist)]">
+        <p className="plate p-6 text-[var(--color-text-2)]">
           Nenhuma ficha atribuída a você ainda. Fale com o Mestre.
         </p>
       </main>
     );
   }
 
+  const characterId = character.id;
   const locked = character.insight_locked_at !== null;
 
-  const onSaveField = (field: keyof CharacterSheetFields, value: string) => {
-    void updateCharacterFields({
-      data: { id: character.id, fields: { [field]: value } },
-    }).then(() => router.invalidate());
-  };
-  const onInsight = (value: number) => {
-    void updateInsight({ data: { id: character.id, insight: value } }).then(
-      () => router.invalidate(),
+  // Player self-edits only their own Insight (the Insanity die). Optimistic so
+  // it feels instant; the sheet text is read-only (the GM authors it).
+  const onInsight = (value: number) =>
+    mutate(
+      (d) => ({
+        ...d,
+        character: d.character ? { ...d.character, insight: value } : d.character,
+      }),
+      () => updateInsight({ data: { id: characterId, insight: value } }),
     );
-  };
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-6">
-      <AppBar subtitle={user.displayName} />
-
-      {/* Shared props — read-only for players, live. */}
-      <section className="panel mb-6 p-5">
-        <SixSuns suns={suns} editable={false} onToggle={() => {}} />
-        <div className="mt-5 border-t border-[var(--color-line)] pt-4">
-          <LegacyTrack entries={legacy} editable={false} />
+    <>
+      <main className="mx-auto max-w-[880px] px-4 py-6 pb-28 sm:px-6 min-[720px]:pb-8">
+        <div id="ficha" className="scroll-mt-20">
+          <Codex character={character} locked={locked} onInsight={onInsight} />
         </div>
-      </section>
 
-      <CharacterSheet
-        character={character}
-        editable={!locked}
-        onSaveField={onSaveField}
-        insightEditable={!locked}
-        onInsightChange={onInsight}
-        locked={locked}
-      />
-    </main>
+        <div className="mt-5 grid gap-5 min-[840px]:grid-cols-2">
+          <section id="sois" className="plate reveal reveal-d1 tiltable scroll-mt-20 p-6">
+            <SunsClock suns={suns} editable={false} />
+          </section>
+          <section id="legado" className="plate reveal reveal-d2 tiltable scroll-mt-20 p-6">
+            <LegacyTrack entries={legacy} editable={false} />
+          </section>
+        </div>
+      </main>
+      <MobileDock />
+    </>
   );
 }

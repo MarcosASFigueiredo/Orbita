@@ -56,7 +56,7 @@ export function AutoField({
 
   return (
     <label className="block">
-      <span className="field-label">{label}</span>
+      {label && <span className="field-label">{label}</span>}
       {multiline ? <textarea rows={3} {...shared} /> : <input type="text" {...shared} />}
     </label>
   )
