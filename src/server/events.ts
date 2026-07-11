@@ -19,7 +19,7 @@ import { characters, legacyEntries, sixSunsState } from '#/server/db/schema'
 import { authSession } from '#/server/auth/config'
 
 const STREAM_MS = 50_000 // bounded window; EventSource reconnects after this
-const POLL_MS = 2_000 // how often we check for a change
+const POLL_MS = 1_000 // how often we check for a change (cheap max(updated_at))
 const HEARTBEAT_MS = 15_000 // comment ping to keep proxies from closing us
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
