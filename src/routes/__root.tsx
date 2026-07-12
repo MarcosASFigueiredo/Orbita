@@ -44,16 +44,6 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
       <head>
-        {/* Runs before first paint: if the session hero was already dismissed,
-            mark <html> so CSS keeps the hero collapsed from the very first frame
-            (no SSR-expanded → client-collapsed jump). See Hero.tsx / styles.css. */}
-        <script
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{if(sessionStorage.getItem('lagash_hero_seen')==='1')document.documentElement.classList.add('hero-seen')}catch(e){}",
-          }}
-        />
         <HeadContent />
       </head>
       <body className="min-h-screen font-sans antialiased [overflow-wrap:anywhere]">
