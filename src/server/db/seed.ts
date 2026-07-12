@@ -1,4 +1,4 @@
-// Lagash VTT — LOCAL/DEV seed. Populates a fresh local database with everything
+// Orbita Suns VTT — LOCAL/DEV seed. Populates a fresh local database with everything
 // you need to develop and log in offline:
 //   - the 5 characters (Halda = reference content, the rest are pt-BR
 //     placeholders) + their Atrito GM notes
@@ -101,11 +101,11 @@ const SEED_CHARACTERS = [
 ]
 
 // Allowlisted local test users. The GM has no characterSlug; the player is bound
-// to the seeded "halda" character. These @lagash.local emails are dev-only and
+// to the seeded "halda" character. These @orbitasuns.local emails are dev-only and
 // never leave local, so they can't leak into a real allowlist.
 const DEV_INVITES: Array<typeof invitedUsers.$inferInsert> = [
-  { email: 'gm@lagash.local', role: 'gm', displayName: 'Mestre (dev)' },
-  { email: 'player@lagash.local', role: 'player', characterSlug: 'halda', displayName: 'Halda (dev)' },
+  { email: 'gm@orbitasuns.local', role: 'gm', displayName: 'Mestre (dev)' },
+  { email: 'player@orbitasuns.local', role: 'player', characterSlug: 'halda', displayName: 'Halda (dev)' },
 ]
 
 async function seed() {

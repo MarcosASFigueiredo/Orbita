@@ -1,8 +1,8 @@
 import { SUN_COUNT } from '#/lib/game'
 
-// The Six Suns — placeholder canonical names, in the order they die (Ardor
-// first … Última last). Confirmed to keep the placeholders for now.
-export const SUN_NAMES = ['Ardor', 'Vigília', 'Zênite', 'Umbra', 'Cinza', 'Última'] as const
+// The Six Suns — canonical names (Greek letters), in the order they die (Alfa
+// first … Beta last). Rendered uppercase by CSS (.sun-label).
+export const SUN_NAMES = ['Alfa', 'Gama', 'Delta', 'Épsilon', 'Zeta', 'Beta'] as const
 
 // Per-sun transition between two states, driving the death/rekindle animation.
 export type SunState = 'lit' | 'dead' | 'dying' | 'kindling'

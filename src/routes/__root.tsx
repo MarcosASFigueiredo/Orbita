@@ -10,11 +10,11 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Lagash — Crônica do Grande Eclipse' },
+      { title: 'Orbita Suns — Crônica dos Seis Sóis' },
       {
         name: 'description',
         content:
-          'Companion de mesa para Lagash: Crônica do Grande Eclipse — fichas e props ao vivo.',
+          'Companion de mesa para Orbita Suns: Crônica dos Seis Sóis — fichas e props ao vivo.',
       },
     ],
     links: [

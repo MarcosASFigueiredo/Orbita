@@ -1,14 +1,14 @@
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { TriangleAlert } from "lucide-react";
-import type { PlayerOption } from "#/components/lagash/AssignOwner";
-import { CharacterDetail } from "#/components/lagash/CharacterDetail";
-import { InvitePanel } from "#/components/lagash/InvitePanel";
-import { LegacyTrack } from "#/components/lagash/LegacyTrack";
-import { NpcPanel } from "#/components/lagash/NpcPanel";
-import { Roster } from "#/components/lagash/Roster";
-import { SunsClock } from "#/components/lagash/SunsClock";
-import { useLagashRealtime } from "#/lib/realtime";
+import type { PlayerOption } from "#/components/orbita-suns/AssignOwner";
+import { CharacterDetail } from "#/components/orbita-suns/CharacterDetail";
+import { InvitePanel } from "#/components/orbita-suns/InvitePanel";
+import { LegacyTrack } from "#/components/orbita-suns/LegacyTrack";
+import { NpcPanel } from "#/components/orbita-suns/NpcPanel";
+import { Roster } from "#/components/orbita-suns/Roster";
+import { SunsClock } from "#/components/orbita-suns/SunsClock";
+import { useRealtime } from "#/lib/realtime";
 import { useOptimisticData } from "#/lib/optimistic";
 import { requestMagicLink } from "#/lib/auth-client";
 import {
@@ -71,7 +71,7 @@ function GmDashboard() {
   const { characters, archivedCharacters, atrito, suns, legacy, invites, npcs } =
     data;
   const [picked, setPicked] = useState<string | null>(null);
-  useLagashRealtime();
+  useRealtime();
 
   // Accepted players (a magic-link login created their account) are the only
   // valid assignment targets. Build the owner-name map + assignment options,

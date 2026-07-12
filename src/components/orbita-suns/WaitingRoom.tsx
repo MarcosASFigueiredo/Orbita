@@ -35,7 +35,7 @@ export function WaitingRoom({ displayName }: { displayName: string }) {
         </svg>
 
         <p className="mb-2 text-[10px] uppercase tracking-[0.24em] text-[var(--color-gold)]">
-          Crônica do Grande Eclipse
+          Crônica dos Seis Sóis
         </p>
         <h1 className="font-display text-3xl font-medium text-[var(--color-starlight)]">
           Bem-vinda, {displayName || 'viajante'}

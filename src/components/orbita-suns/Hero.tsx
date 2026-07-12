@@ -83,10 +83,10 @@ export function Hero() {
 
       <div ref={textRef} className="[will-change:transform,opacity]">
         <p className="mb-4 text-[10px] uppercase tracking-[0.4em] text-[var(--color-gold)]">
-          A escuridão vem a cada 2049 anos
+          Sob a luz dos seis sóis
         </p>
         <h1 className="font-display text-[clamp(38px,6.5vw,72px)] font-medium leading-none tracking-[0.14em] text-[var(--color-starlight)]">
-          LAGASH
+          ORBITA SUNS
         </h1>
         <p className="mt-4 font-serif text-[clamp(15px,2vw,19px)] italic text-[var(--color-text-2)]">
           O que vocês salvarem da luz, atravessará a noite.

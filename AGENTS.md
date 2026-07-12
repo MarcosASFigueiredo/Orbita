@@ -16,12 +16,12 @@ Durable context for humans and AI agents working on this repo. Keep this current
 ## What this is
 
 Repo root `/home/archie/projects/orbita` (package `orbita`). It started as a
-**blank TanStack Start** (React) scaffold and now hosts **Lagash VTT** — a
-companion web app for the tabletop RPG *"Lagash: Crônica do Grande Eclipse"*
+**blank TanStack Start** (React) scaffold and now hosts **Orbita Suns VTT** — a
+companion web app for the tabletop RPG *"Orbita Suns: Crônica dos Seis Sóis"*
 (a modified Cthulhu Dark game). The scaffold/deploy history is below; the
 application architecture is in the next section.
 
-## Lagash VTT — application
+## Orbita Suns VTT — application
 
 Single-table companion app (1 GM + 5 players, no multi-tenant). Replaces paper
 sheets and physical props with live-synced digital equivalents. **All UI copy is
@@ -103,7 +103,7 @@ Suns + Legacy + Insight-6 **sacrifice** prompt).
 **Realtime (SSE):** `src/server/events.ts` serves a bounded (~50s) `text/event-stream`
 at `/api/events` (mounted in `src/start.ts`) that polls `max(updated_at)` across
 the three shared tables every 1s (Neon's HTTP driver can't do LISTEN/NOTIFY) and
-emits `{changed:true}`. Client `src/lib/realtime.ts#useLagashRealtime()` opens an
+emits `{changed:true}`. Client `src/lib/realtime.ts#useRealtime()` opens an
 `EventSource` → `router.invalidate()` on each signal; the browser auto-reconnects
 after the bounded window. **Invites, NPCs, and PC assignment/archive are NOT in
 the SSE feed** — the GM route persists then calls `router.invalidate()` explicitly
@@ -131,7 +131,7 @@ the server console** (`src/lib/mail.ts` fallback) so you can sign in offline.
 Drizzle scripts: `pnpm db:generate|migrate|push|studio|seed` and the Docker
 local-dev set (`db:up|down|reset`, `dev:setup`). `db:seed` is **local-only**
 (hard-refuses any non-`db.localtest.me` DATABASE_URL): it seeds the characters +
-shared tracks + two `@lagash.local` test users. Staging/production are no longer
+shared tracks + two `@orbitasuns.local` test users. Staging/production are no longer
 seeded — real players are added by the GM from the in-app invite UI.
 
 **Multi-environment migrations:** `drizzle-kit migrate` targets whatever

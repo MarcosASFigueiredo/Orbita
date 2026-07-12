@@ -32,14 +32,14 @@ const { createInvite, listInvites, normalizeEmail, resendInvite, revokeInvite } 
 
 const gm: AuthUser = {
   id: 'gm-1',
-  email: 'mestre@lagash.test',
+  email: 'mestre@orbitasuns.test',
   role: 'gm',
   displayName: 'Mestre',
   characterSlug: null,
 }
 const player: AuthUser = {
   id: 'p-1',
-  email: 'jogadora@lagash.test',
+  email: 'jogadora@orbitasuns.test',
   role: 'player',
   displayName: 'Jogadora',
   characterSlug: 'halda',
@@ -71,7 +71,7 @@ describe('invite authorization', () => {
 
 describe('invite validation', () => {
   it('normalizeEmail trims and lowercases', () => {
-    expect(normalizeEmail('  Mestre@Lagash.TEST ')).toBe('mestre@lagash.test')
+    expect(normalizeEmail('  Mestre@Orbitasuns.TEST ')).toBe('mestre@orbitasuns.test')
   })
 
   it('rejects a malformed email without touching the db', async () => {
@@ -81,7 +81,7 @@ describe('invite validation', () => {
 
   it('accepts a valid invite from the GM', async () => {
     const res = await createInvite(gm, {
-      email: 'Nova@Lagash.test',
+      email: 'Nova@Orbitasuns.test',
       displayName: 'Nova',
     })
     expect(res).toEqual({ ok: true, error: null })

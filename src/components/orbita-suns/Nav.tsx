@@ -50,10 +50,10 @@ export function Nav({
     >
       <div className="leading-tight">
         <span className="font-display text-[17px] tracking-[6px] text-[var(--color-gold)]">
-          LAGASH
+          ORBITA SUNS
         </span>
         <span className="mt-0.5 block text-[8.5px] font-normal uppercase tracking-[0.28em] text-[var(--color-text-3)]">
-          Crônica do Grande Eclipse
+          Crônica dos Seis Sóis
         </span>
       </div>
 

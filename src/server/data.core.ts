@@ -1,4 +1,4 @@
-// Server-only data layer for Lagash. Holds the Neon/Drizzle access + the
+// Server-only data layer for Orbita Suns. Holds the Neon/Drizzle access + the
 // ported authorization logic. Kept separate from the createServerFn wrappers in
 // `data.ts` so the Neon client never enters the client module graph: these
 // cores are referenced ONLY inside server-fn handler bodies (which are stripped

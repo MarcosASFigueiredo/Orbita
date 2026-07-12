@@ -1,4 +1,4 @@
-# Local development backing services for Lagash / orbita.
+# Local development backing services for Orbita Suns.
 #
 # The app reaches Postgres through Neon's HTTP serverless driver (neon-http),
 # not the raw Postgres wire protocol — so a plain Postgres container isn't

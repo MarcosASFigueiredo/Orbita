@@ -1,4 +1,4 @@
-// Framework-neutral domain types + constants for the Lagash game model.
+// Framework-neutral domain types + constants for the Orbita Suns game model.
 // These are the shapes the UI and server functions speak (snake_case, with
 // timestamps as ISO strings) — the stable API/DTO contract, deliberately
 // decoupled from the Drizzle row shape so the DB layer can change underneath

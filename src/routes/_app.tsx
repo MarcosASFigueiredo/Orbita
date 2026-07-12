@@ -5,9 +5,9 @@ import {
   useLocation,
 } from "@tanstack/react-router";
 import { fetchCurrentUser } from "#/server/auth";
-import { Cosmos } from "#/components/lagash/Cosmos";
-import { Hero } from "#/components/lagash/Hero";
-import { Nav } from "#/components/lagash/Nav";
+import { Cosmos } from "#/components/orbita-suns/Cosmos";
+import { Hero } from "#/components/orbita-suns/Hero";
+import { Nav } from "#/components/orbita-suns/Nav";
 import { useCinematics } from "#/lib/cinematics";
 
 // Authenticated layout. Resolves the user once and exposes it to child routes

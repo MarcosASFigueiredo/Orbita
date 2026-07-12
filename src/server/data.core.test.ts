@@ -35,14 +35,14 @@ const {
 
 const gm: AuthUser = {
   id: 'gm-1',
-  email: 'mestre@lagash.test',
+  email: 'mestre@orbitasuns.test',
   role: 'gm',
   displayName: 'Mestre',
   characterSlug: null,
 }
 const player: AuthUser = {
   id: 'p-1',
-  email: 'jogadora@lagash.test',
+  email: 'jogadora@orbitasuns.test',
   role: 'player',
   displayName: 'Jogadora',
   characterSlug: 'halda',
