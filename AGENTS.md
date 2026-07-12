@@ -37,23 +37,42 @@ off Supabase — see the history note at the end of this section.) Skills consul
 
 **Data model** (`src/server/db/schema.ts`, migrations in `drizzle/`):
 - Auth.js adapter tables: `users` (role gm|player), `accounts`, `sessions`,
-  `verification_tokens`. `invited_users` = email allowlist → role + `character_slug`;
+  `verification_tokens`. `invited_users` = email allowlist **and** the invite
+  registry the GM manages from the UI → role + optional `character_slug`;
   provisioning happens in the Auth.js `createUser` event (role + PC ownership).
+  **Invite status is derived, never stored**: a `users` row for the email =
+  accepted, else pending (join in `invites.core.ts`, can't drift).
 - `characters` (public sheet fields + `insight` 0–6 + `insight_locked_at`;
-  `owner_user_id` → users).
+  `owner_user_id` → users; **`deleted_at`** = soft delete). GM creates/archives
+  PCs from the UI; ownership (which sheet a player sees) is `owner_user_id`, not
+  `character_slug` (slug is just a stable unique id, auto-generated on create).
+- `npcs` (**GM-only prep entities** — nome/papel/descricao/notas/faccao/local as
+  free text, `position`, `deleted_at`). A **separate table from `characters`**
+  (not a `kind` column) so an over-broad character read can never leak an NPC to
+  a player — same defense-in-depth as Atrito. No Insight, no owner.
 - `character_gm_notes` (**Atrito** — separate GM-only table, unreachable by players).
 - `six_suns_state` (singleton row, `suns boolean[6]`), `legacy_entries`
   (list, status secured|threatened|lost).
-- A `set_updated_at` trigger (`drizzle/0001`) bumps `updated_at` on the three
-  shared tables — the SSE change feed polls `max(updated_at)` off it.
+- A `set_updated_at` trigger (`drizzle/0001`, + `npcs` in `drizzle/0002`) bumps
+  `updated_at` on mutation — the SSE change feed polls `max(updated_at)` off the
+  three shared tables. **Soft delete = `deleted_at IS NULL` filter on every PC/NPC
+  read** (`getPlayerHome`, `getGmDashboard`, `ownedCharacter`, the `getCurrentUser`
+  join); archiving a PC also clears `owner_user_id`, restore brings it back unowned.
 
 **Permissions (app-layer authz — RLS is gone):** Neon has no row-level security,
-so every old RLS policy lives in `src/server/data.core.ts`: cores take an explicit
-`AuthUser`; GM reads/writes everything (`assertGm`); a player is scoped to their
-own `characters` row by `character_slug`; shared tracks are read-only for players,
-GM-writable; Atrito is GM-only. Mutations return `{ok:false}` (0 rows) on an
-unauthorized target — the silent-denial equivalent. Route guards (`beforeLoad`)
-are UX; the data boundary is these cores.
+so every old RLS policy lives in the server-only cores (`data.core.ts`,
+`invites.core.ts`, `npcs.core.ts`): cores take an explicit `AuthUser`; GM
+reads/writes everything (`assertGm`); a player is scoped to their own `characters`
+row by `character_slug`; shared tracks are read-only for players, GM-writable;
+Atrito, **NPCs, invites, PC create/assign/archive/restore are all GM-only**.
+Mutations return `{ok:false}` (0 rows) on an unauthorized target — the
+silent-denial equivalent. Route guards (`beforeLoad`) are UX; the data boundary is
+these cores. **Assignment enforces 1 PC per player**: `assignCharacter` clears the
+player off any other PC before binding, matching the `.limit(1)` in
+`getCurrentUser`'s owner join. Authz is covered by `src/server/*.core.test.ts` —
+they `vi.mock` the DB client + `auth/config` so the **real** `assertGm` runs in
+node and every player-calls-GM path asserts `/GM only/` before any query (plus an
+NPC-isolation check: `getPlayerHome`'s payload is exactly `{character, legacy, suns}`).
 
 **Auth (Auth.js, self-hosted):** no TanStack adapter exists, so `@auth/core` is
 mounted as a **global request middleware in `src/start.ts`** that delegates
@@ -65,46 +84,103 @@ the middleware `.server()` body so they never enter the client bundle. Identity
 seam = `src/server/session.ts` (`getCurrentUser`/`requireUser`/`requireGm`).
 
 **Routes:** `/login` (POST `/api/auth/signin/resend` for the magic link — no
-confirm page; Auth.js owns the callback at `/api/auth/callback/resend`), `_app`
-(auth layout, resolves user into context), `_app/` = `/` (player: own sheet + live
-tracks; GM redirected), `_app/gm` = `/gm` (GM dashboard: all sheets + Atrito + Six
+confirm page; Auth.js owns the callback at `/api/auth/callback/resend`; the client
+helper is `src/lib/auth-client.ts#requestMagicLink`, shared with the GM invite
+action — one email mechanism, never two), `_app` (auth layout, resolves user into
+context), `_app/` = `/` (player: own sheet + live tracks; **accepted-but-unassigned
+player → themed `WaitingRoom`, which swaps to the codex live via SSE when the GM
+assigns**; GM redirected), `_app/gm` = `/gm` (GM dashboard: **invite players
+(`InvitePanel`), create/assign/archive/restore PCs, roster with owner badges,
+CharacterDetail with `AssignOwner`, NPC workbench (`NpcPanel`)** + Atrito + Six
 Suns + Legacy + Insight-6 **sacrifice** prompt).
+
+> **Guard subtlety:** a resolved user is already past the Auth.js `signIn`
+> allowlist gate, so `_app`/`login` `beforeLoad` let **any** logged-in user in — a
+> player with no assigned PC lands on the waiting room, **not** back on `/login`.
+> (The old `player && !characterSlug → /login` bounce made the waiting room
+> unreachable; removed.)
 
 **Realtime (SSE):** `src/server/events.ts` serves a bounded (~50s) `text/event-stream`
 at `/api/events` (mounted in `src/start.ts`) that polls `max(updated_at)` across
-the three shared tables every 2s (Neon's HTTP driver can't do LISTEN/NOTIFY) and
+the three shared tables every 1s (Neon's HTTP driver can't do LISTEN/NOTIFY) and
 emits `{changed:true}`. Client `src/lib/realtime.ts#useLagashRealtime()` opens an
 `EventSource` → `router.invalidate()` on each signal; the browser auto-reconnects
-after the bounded window.
+after the bounded window. **Invites, NPCs, and PC assignment/archive are NOT in
+the SSE feed** — the GM route persists then calls `router.invalidate()` explicitly
+(outside the optimistic overlay in `src/lib/optimistic.ts`).
 
 **Server functions:** `src/server/auth.ts` (`fetchCurrentUser`), `src/server/data.ts`
-(thin `createServerFn` wrappers) over `src/server/data.core.ts` (server-only cores +
-Drizzle access). Neon client in `src/server/db/client.ts` (marked `server-only`).
+(thin `createServerFn` wrappers) over the server-only cores: `src/server/data.core.ts`
+(sheets, tracks, PC create/assign/archive/restore, GM dashboard aggregate),
+`src/server/invites.core.ts` (invite list/create/resend/revoke), `src/server/npcs.core.ts`
+(NPC CRUD + archive/restore). Neon client in `src/server/db/client.ts` (marked
+`server-only`). Pure testable helpers in `src/lib/` (`character.ts#slugFromName`,
+`roster.ts`, `insight.ts`, `suns.ts`).
 
 **Decisions locked with the user:** player self-edits own Insight (GM overrides);
 players see **only their own** sheet (not peers'); devices = phone (players) +
-desktop (GM) — player views phone-first, GM dashboard desktop-first.
+desktop (GM) — player views phone-first, GM dashboard desktop-first; **1 PC per
+player** (reassign clears the old bond, with a UI confirm); NPC faction/location =
+free text; **resend invalidates the previous magic link**; **soft delete + restore
+for PC and NPC** (restore returns a PC unowned — GM reassigns, keeping the 1:1 rule).
 
 **Env:** `DATABASE_URL` (Neon), `AUTH_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM`
 (all server-only, no `VITE_` prefix). Without `AUTH_SECRET` the app degrades to
-the login screen. Drizzle scripts: `pnpm db:generate|migrate|push|studio|seed`.
+the login screen; without `RESEND_API_KEY` in dev, the magic link is **printed to
+the server console** (`src/lib/mail.ts` fallback) so you can sign in offline.
+Drizzle scripts: `pnpm db:generate|migrate|push|studio|seed`, plus
+`db:seed:invites` (allowlist) and the Docker local-dev set (`db:up|down|reset`,
+`dev:setup`).
+
+**Multi-environment migrations:** `drizzle-kit migrate` targets whatever
+`DATABASE_URL` is set at run time and journals applied migrations **per-DB**
+(idempotent). Run per env by pointing `dotenv` at a per-env file (all `.env.*` are
+gitignored) — the existing `import 'dotenv/config'` honors `DOTENV_CONFIG_PATH`,
+so no new dependency:
+```bash
+DOTENV_CONFIG_PATH=.env.staging    pnpm db:migrate
+DOTENV_CONFIG_PATH=.env.production pnpm db:migrate
+```
+For Neon, use the **direct (non-`-pooler`) connection string + `?sslmode=require`**
+for migrations — drizzle-kit uses the `pg` driver (installed for Docker) over the
+wire protocol; the pooler (PgBouncer) can trip on session statements. The app
+runtime keeps the `neon-http` driver over the pooler.
 
 **Gotchas:**
-- Server-only modules (Neon, `@auth/core`, `events.ts`) must never reach the
-  client bundle — keep them in `server-only`-marked files and reference them only
-  inside server-fn / middleware `.server()` bodies (dynamic import in `start.ts`).
-  The build's import-protection plugin fails otherwise.
+- Server-only modules (Neon, `@auth/core`, `events.ts`, the `*.core.ts`) must never
+  reach the client bundle — keep them in `server-only`-marked files and reference
+  them only inside server-fn / middleware `.server()` bodies (dynamic import in
+  `start.ts`). The build's import-protection plugin fails otherwise.
 - Auth.js `@auth/core` defaults `basePath` to `/auth`; we set `/api/auth` in
   `authConfig` **and** pass it as the 5th arg to `createActionURL`.
-- 4 of 5 sheets are pt-BR placeholders pending real content (Halda is real).
+- **NPCs are GM-only by table isolation** — never add an NPC field to any
+  Player-facing response (`getPlayerHome` etc.); keep them behind `npcs.core.ts`.
+- **Invite status is derived**, not a column — don't add a `status` field; join
+  `users` on `lower(email)`.
+- `character_slug` is legacy: ownership/what-a-player-sees is `owner_user_id`. New
+  PCs get an auto-generated slug (`slugFromName(nome)` + random suffix).
+- Authz `*.core.test.ts` must `vi.mock` `@tanstack/react-start/server-only`,
+  `#/server/auth/config`, and `#/server/db/client` (chainable Proxy → `[]`) so the
+  real `session.ts`/`assertGm` load in node without a live DB.
 
-**Next steps:** (1) set real `AUTH_SECRET`/`RESEND_API_KEY`/`EMAIL_FROM` in `.env`
-+ Vercel, seed `invited_users` with the GM + 5 player emails, confirm real email
-delivery; (2) drop in the 4 remaining sheets' real text; (3) optional dice roller.
+**Next steps:** (1) **run `pnpm db:migrate` on every DB** (local done; staging/prod
+via `DOTENV_CONFIG_PATH=...` above) — migration `0002` adds `characters.deleted_at`
++ the `npcs` table; (2) set real `AUTH_SECRET`/`RESEND_API_KEY`/`EMAIL_FROM` in
+`.env` + Vercel and confirm real email delivery; (3) seed `invited_users` with the
+GM email (`db:seed:invites`) — the GM then invites players + creates/assigns sheets
+from the UI (no manual seed needed); (4) **decide the prod seed**: `db:seed` still
+inserts the 5 legacy fixed PCs — trim it to just the six-suns singleton + allowlist
+before seeding prod, or skip it; (5) verify the full feature live (invite email
+round-trip, assignment, archive/restore, waiting room over SSE) — none verified
+in-session; (6) optional dice roller.
 
 **History:** originally built on Supabase (auth + Postgres + Realtime + RLS);
 migrated to the Neon/Drizzle/Auth.js/SSE/Resend stack above to run at $0 on
-OSS/self-hostable infra. RLS moved to app-layer authz; Realtime moved to SSE.
+OSS/self-hostable infra (RLS → app-layer authz; Realtime → SSE). Then the
+"Observatório" frontend redesign (obsidian+gold, Three.js cosmos, live Six Suns
+astrolabe) + optimistic editing. Then **GM-managed invites, PC/NPC sheet creation,
+and PC→player assignment** (this branch, `feat/gm-invites-sheets`) — closing the
+loop so the GM runs everything from the UI, no manual seed/DB.
 
 ---
 
@@ -261,6 +337,10 @@ Target is **Vercel**, configured. See **`DEPLOYMENT.md`** for the full guide.
 - `VITE_`-prefixed vars are build-time inlined and **public** — never store secrets
   there; server secrets get no prefix and are read per-request (never at module scope).
 - Local SSR preview is `pnpm start`, not `pnpm preview` (which serves client only).
+- **Dev env is Arch Linux (WSL).** `less` was dropped from Arch's `base` group, so
+  a `pacman -Syu` can remove it and break git's default pager (`cannot run less`).
+  Fix: `sudo pacman -Syu less` (a plain `-Sy` 404s on a stale package DB). Once
+  installed explicitly it survives future upgrades.
 - Adding the `nitro()` plugin changed the build output from `dist/` to `.output/`
   (`.vercel/output/` on Vercel). Both are gitignored.
 - Git repo was initialized by the CLI but has **no commits yet** — make an initial commit.
