@@ -1,4 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap");
+/* Fonts (Cinzel / Cormorant Garamond / Inter) are loaded via <link> in the
+   document head (see src/routes/__root.tsx) with a preconnect, instead of a
+   render-blocking CSS @import that serialized behind this file's download. */
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
@@ -427,6 +429,14 @@ a {
 }
 .hero-corona {
   animation: corona-pulse 8s ease-in-out infinite;
+}
+
+/* The hero occupies layout only until it's been dismissed for the session. The
+   class is set pre-hydration (head script) for returning visitors and by the
+   scroll handler on first dismissal, so it never reflows after paint. Unlayered,
+   so it wins over the Tailwind `flex` utility without !important. */
+html.hero-seen .hero-intro {
+  display: none;
 }
 
 /* ---- Scroll reveals (staggered fade + rise via IntersectionObserver) ---- */

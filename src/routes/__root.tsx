@@ -17,7 +17,25 @@ export const Route = createRootRoute({
           'Companion de mesa para Lagash: Crônica do Grande Eclipse — fichas e props ao vivo.',
       },
     ],
-    links: [{ rel: 'stylesheet', href: appCss }],
+    links: [
+      // Warm the Google Fonts connections before the CSS that references them is
+      // parsed — this removes the DNS+TLS handshake from the LCP critical path.
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossOrigin: 'anonymous',
+      },
+      { rel: 'stylesheet', href: appCss },
+      // Fonts moved out of the CSS `@import` (which was discovered only after
+      // app CSS downloaded + parsed, serializing the request) into a head <link>
+      // so the preload scanner fetches it in parallel. `display=swap` keeps the
+      // H1 (LCP) painting immediately in the fallback face.
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@300;400;500;600&display=swap',
+      },
+    ],
   }),
   shellComponent: RootDocument,
 })
@@ -26,6 +44,16 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className="dark">
       <head>
+        {/* Runs before first paint: if the session hero was already dismissed,
+            mark <html> so CSS keeps the hero collapsed from the very first frame
+            (no SSR-expanded → client-collapsed jump). See Hero.tsx / styles.css. */}
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(sessionStorage.getItem('lagash_hero_seen')==='1')document.documentElement.classList.add('hero-seen')}catch(e){}",
+          }}
+        />
         <HeadContent />
       </head>
       <body className="min-h-screen font-sans antialiased [overflow-wrap:anywhere]">

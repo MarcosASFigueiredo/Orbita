@@ -21,8 +21,12 @@ export async function sendMagicLinkEmail({
   if (!apiKey) {
     // Local-dev convenience: with no mail provider configured, print the magic
     // link to the server console so you can sign in offline without sending
-    // real email. In production a missing key is a misconfiguration — fail loud.
-    if (process.env.NODE_ENV !== 'production') {
+    // real email. Fires under the dev server (NODE_ENV !== 'production'), or when
+    // MAIL_DEV_LOG=1 is set explicitly — needed because a bundled/prod build
+    // hardcodes NODE_ENV=production (Nitro), so that's the only way to get a link
+    // when running `node .output/server` locally (e.g. to measure prod perf).
+    // In a real deployment the key is set, so this branch never runs there.
+    if (process.env.NODE_ENV !== 'production' || process.env.MAIL_DEV_LOG === '1') {
       console.log(`\n✉️  [dev] Magic link for ${to}:\n   ${url}\n`)
       return
     }
