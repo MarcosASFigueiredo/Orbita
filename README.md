@@ -1,6 +1,6 @@
-# Lagash VTT (orbita)
+# Orbita Suns VTT
 
-Companion web app for the tabletop RPG *"Lagash: Crônica do Grande Eclipse"*.
+Companion web app for the tabletop RPG *"Orbita Suns: Crônica do Grande Eclipse"*.
 Stack: React 19 + TanStack Start, Postgres via Drizzle ORM, self-hosted Auth.js
 magic-link auth, SSE realtime. Production runs on Neon + Resend; local dev runs
 entirely on Docker with **no external accounts and no internet required**.
@@ -32,10 +32,10 @@ Auth is passwordless magic-link. Locally there's no mail provider, so the link
 is **printed to the terminal running `pnpm dev`** instead of being emailed.
 
 1. Go to `http://localhost:3000/login` and enter a seeded test email:
-   - `gm@lagash.local` — the **GM** (dashboard at `/gm`)
-   - `player@lagash.local` — a **Player** bound to the *Halda* sheet
+   - `gm@orbitasuns.local` — the **GM** (dashboard at `/gm`)
+   - `player@orbitasuns.local` — a **Player** bound to the *Halda* sheet
 2. Look in the `pnpm dev` terminal for a line like
-   `✉️  [dev] Magic link for gm@lagash.local: http://localhost:3000/api/auth/callback/...`
+   `✉️  [dev] Magic link for gm@orbitasuns.local: http://localhost:3000/api/auth/callback/...`
 3. Paste that URL into the browser — you're signed in.
 
 Only allowlisted emails may sign in (`invited_users` table). Add more via

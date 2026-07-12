@@ -11,7 +11,7 @@ import { useRouter } from '@tanstack/react-router'
 // The server stream is bounded (~50s); the browser's EventSource reconnects on
 // its own. On each reconnect we invalidate once to catch anything that changed
 // during the brief gap.
-export function useLagashRealtime() {
+export function useRealtime() {
   const router = useRouter()
 
   useEffect(() => {

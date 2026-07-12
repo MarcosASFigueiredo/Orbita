@@ -1,10 +1,10 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
-import { Codex } from "#/components/lagash/Codex";
-import { LegacyTrack } from "#/components/lagash/LegacyTrack";
-import { MobileDock } from "#/components/lagash/MobileDock";
-import { SunsClock } from "#/components/lagash/SunsClock";
-import { WaitingRoom } from "#/components/lagash/WaitingRoom";
-import { useLagashRealtime } from "#/lib/realtime";
+import { Codex } from "#/components/orbita-suns/Codex";
+import { LegacyTrack } from "#/components/orbita-suns/LegacyTrack";
+import { MobileDock } from "#/components/orbita-suns/MobileDock";
+import { SunsClock } from "#/components/orbita-suns/SunsClock";
+import { WaitingRoom } from "#/components/orbita-suns/WaitingRoom";
+import { useRealtime } from "#/lib/realtime";
 import { useOptimisticData } from "#/lib/optimistic";
 import { fetchPlayerHome, updateInsight } from "#/server/data";
 
@@ -22,7 +22,7 @@ function PlayerHome() {
   const { user } = Route.useRouteContext();
   const [data, mutate] = useOptimisticData(Route.useLoaderData());
   const { character, suns, legacy } = data;
-  useLagashRealtime();
+  useRealtime();
 
   if (!character) {
     return <WaitingRoom displayName={user.displayName} />;

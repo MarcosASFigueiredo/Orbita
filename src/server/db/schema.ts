@@ -1,4 +1,4 @@
-// Lagash VTT — Drizzle schema for Neon Postgres.
+// Orbita Suns VTT — Drizzle schema for Neon Postgres.
 //
 // Preserves the original game data model, with two structural changes from the
 // stack it was migrated off:

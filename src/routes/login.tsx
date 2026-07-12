@@ -52,7 +52,7 @@ function LoginPage() {
           Crônica do Grande Eclipse
         </p>
         <h1 className="font-display text-4xl font-semibold text-[var(--color-starlight)]">
-          Lagash
+          Orbita Suns
         </h1>
       </div>
 

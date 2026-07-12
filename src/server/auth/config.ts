@@ -49,7 +49,7 @@ export const authConfig: AuthConfig = {
       // apiKey is required by the provider type but unused: our overridden
       // sendVerificationRequest routes through the swappable lib/mail.ts.
       apiKey: process.env.RESEND_API_KEY ?? 'unused',
-      from: process.env.EMAIL_FROM ?? 'Lagash <onboarding@resend.dev>',
+      from: process.env.EMAIL_FROM ?? 'Orbita Suns <onboarding@resend.dev>',
       async sendVerificationRequest({ identifier, url, provider }) {
         // Allowlist gate, layer 1: never email a non-invited address. Return
         // silently (no error) so the allowlist can't be probed from the UI.
