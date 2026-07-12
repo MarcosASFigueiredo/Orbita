@@ -12,11 +12,6 @@ export function Cosmos() {
 
   useEffect(() => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    // Phones skip the animated cosmos entirely: three.js (724 kB) is never
-    // imported and no WebGL context is created. The CSS starfield + gradient
-    // background (styles.css) stands in. This is the biggest win for the devices
-    // most players use during a session — the GM panel gets the whole CPU/GPU.
-    if (window.innerWidth < 720) return
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -28,13 +23,17 @@ export function Cosmos() {
       if (cancelled || !canvasRef.current) return
 
       // Graceful degradation: full scene on capable desktops, a lighter tier on
-      // weak machines (few cores / little memory).
+      // weak machines (few cores / little memory), a minimal tier on phones
+      // (no galaxy / nebula / shooters).
       const cores = navigator.hardwareConcurrency ?? 8
       const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 8
+      const mobile = window.innerWidth < 720
       const weak = cores <= 4 || mem <= 4
-      const cfg = weak
-        ? { far: 1600, near: 400, twinkle: 120, galaxy: 3000, nebula: true, shooters: true, dpr: 1.5 }
-        : { far: 2600, near: 700, twinkle: 220, galaxy: 7000, nebula: true, shooters: true, dpr: 1.75 }
+      const cfg = mobile
+        ? { far: 1100, near: 320, twinkle: 90, galaxy: 0, nebula: false, shooters: false, dpr: 1.5 }
+        : weak
+          ? { far: 1600, near: 400, twinkle: 120, galaxy: 3000, nebula: true, shooters: true, dpr: 1.5 }
+          : { far: 2600, near: 700, twinkle: 220, galaxy: 7000, nebula: true, shooters: true, dpr: 1.75 }
 
       const renderer = new T.WebGLRenderer({ canvas, antialias: true })
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, cfg.dpr))
