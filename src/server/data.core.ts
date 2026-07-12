@@ -211,22 +211,13 @@ const SHEET_COLUMN = {
 
 // A player may only touch their own PC (by slug); the GM may touch any (by id).
 // Returns a WHERE that yields zero rows for an unauthorized target.
-function ownedCharacter(user: AuthUser, id: string) {
-  if (user.role === 'gm') {
-    return and(eq(characters.id, id), isNull(characters.deletedAt))
-  }
-  return and(
-    eq(characters.id, id),
-    eq(characters.slug, user.characterSlug ?? '\0'),
-    isNull(characters.deletedAt),
-  )
-}
-
-// Save editable sheet text. Only whitelisted fields; only on an owned PC.
+// GM-only: save editable sheet text (whitelisted fields only). Players used to
+// edit their own sheet, but the GM now controls all sheets.
 export async function saveCharacterFields(
   user: AuthUser,
   input: { id: string; fields: Partial<CharacterSheetFields> },
 ): Promise<MutationResult> {
+  assertGm(user)
   const patch: Partial<typeof characters.$inferInsert> = {}
   for (const key of SHEET_KEYS) {
     const value = input.fields[key]
@@ -238,7 +229,7 @@ export async function saveCharacterFields(
   const res = await db
     .update(characters)
     .set(patch)
-    .where(ownedCharacter(user, input.id))
+    .where(and(eq(characters.id, input.id), isNull(characters.deletedAt)))
     .returning({ id: characters.id })
   return { ok: res.length > 0, error: res.length ? null : 'not_authorized' }
 }
@@ -344,11 +335,14 @@ export async function restoreCharacter(
   return { ok: true, error: null }
 }
 
-// Set a character's Insight (clamped 0–6). Players may edit their own; GM any.
+// GM-only: set a character's Insight (clamped 0–6). Players used to self-edit
+// their own Insight (the Insanity die), but that was removed — the GM now
+// controls all sheet values, so this asserts GM like the other sheet mutations.
 export async function setInsight(
   user: AuthUser,
   input: { id: string; insight: number },
 ): Promise<MutationResult & { insight: number }> {
+  assertGm(user)
   const insight = Math.max(
     INSIGHT_MIN,
     Math.min(INSIGHT_MAX, Math.round(input.insight)),
@@ -356,7 +350,7 @@ export async function setInsight(
   const res = await db
     .update(characters)
     .set({ insight })
-    .where(ownedCharacter(user, input.id))
+    .where(and(eq(characters.id, input.id), isNull(characters.deletedAt)))
     .returning({ id: characters.id })
   return {
     ok: res.length > 0,

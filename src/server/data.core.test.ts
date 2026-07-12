@@ -31,6 +31,8 @@ const {
   createCharacter,
   getGmDashboard,
   restoreCharacter,
+  saveCharacterFields,
+  setInsight,
 } = await import('#/server/data.core')
 
 const gm: AuthUser = {
@@ -75,6 +77,18 @@ describe('character/dashboard authorization', () => {
     await expect(restoreCharacter(player, { id: 'c1' })).rejects.toThrow(
       /GM only/,
     )
+  })
+
+  it('rejects a player setting Insight (GM controls sheets now)', async () => {
+    await expect(
+      setInsight(player, { id: 'c1', insight: 3 }),
+    ).rejects.toThrow(/GM only/)
+  })
+
+  it('rejects a player editing sheet fields (GM controls sheets now)', async () => {
+    await expect(
+      saveCharacterFields(player, { id: 'c1', fields: { nome: 'X' } }),
+    ).rejects.toThrow(/GM only/)
   })
 })
 

@@ -65,11 +65,11 @@ export const restoreCharacterSheet = createServerFn({ method: 'POST' })
 
 export const updateCharacterFields = createServerFn({ method: 'POST' })
   .validator((input: { id: string; fields: Partial<CharacterSheetFields> }) => input)
-  .handler(async ({ data }) => saveCharacterFields(await requireUser(), data))
+  .handler(async ({ data }) => saveCharacterFields(await requireGm(), data))
 
 export const updateInsight = createServerFn({ method: 'POST' })
   .validator((input: { id: string; insight: number }) => input)
-  .handler(async ({ data }) => setInsight(await requireUser(), data))
+  .handler(async ({ data }) => setInsight(await requireGm(), data))
 
 export const lockCharacter = createServerFn({ method: 'POST' })
   .validator((input: { id: string; locked: boolean }) => input)
