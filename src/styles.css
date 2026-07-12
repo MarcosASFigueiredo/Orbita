@@ -431,14 +431,6 @@ a {
   animation: corona-pulse 8s ease-in-out infinite;
 }
 
-/* The hero occupies layout only until it's been dismissed for the session. The
-   class is set pre-hydration (head script) for returning visitors and by the
-   scroll handler on first dismissal, so it never reflows after paint. Unlayered,
-   so it wins over the Tailwind `flex` utility without !important. */
-html.hero-seen .hero-intro {
-  display: none;
-}
-
 /* ---- Scroll reveals (staggered fade + rise via IntersectionObserver) ---- */
 .reveal {
   opacity: 0;

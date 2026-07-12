@@ -1,30 +1,19 @@
 import { useEffect, useRef } from 'react'
 
-const SEEN_KEY = 'lagash_hero_seen'
-
-// Full-screen astrolabe hero shown on the first visit of a session; it collapses
-// away after the first scroll (persisted per tab), so the GM never spends half a
-// screen on it every visit. The astrolabe tilts toward the cursor and parallaxes
-// on scroll. Frozen under prefers-reduced-motion.
-//
-// CLS note: the DOM is rendered identically on the server and the client (no
-// conditional unmount). Whether the hero occupies space is decided purely in CSS
-// by the `hero-seen` class on <html>, which a tiny pre-hydration script in the
-// document head sets from sessionStorage *before the first paint* (see
-// __root.tsx / styles.css). So a returning visitor never sees the hero flash in
-// and then collapse — which used to shove the whole <main> up ~58vh after
-// hydration and was the dominant layout shift.
+// Full-screen astrolabe hero shown at the top of every visit. The astrolabe
+// tilts toward the cursor and parallaxes on scroll as it leaves the viewport;
+// it stays in normal flow and simply scrolls away. It is never collapsed/hidden
+// (the per-session hide-after-scroll behavior was removed). Frozen under
+// prefers-reduced-motion. Renders identically on server and client, so it adds
+// no layout shift.
 export function Hero() {
   const astroRef = useRef<HTMLDivElement>(null)
   const textRef = useRef<HTMLDivElement>(null)
 
   // Cursor tilt + scroll parallax (astrolabe rises/shrinks/fades, text leaves
-  // faster), plus the one-way collapse on the first meaningful scroll. rAF on
-  // stable refs; skipped entirely when the hero is already collapsed for this
-  // session or under reduced-motion.
+  // faster). The rAF reads scrollY directly each frame; skipped under
+  // reduced-motion.
   useEffect(() => {
-    const root = document.documentElement
-    if (root.classList.contains('hero-seen')) return
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return
 
     let mx = 0
@@ -33,16 +22,6 @@ export function Hero() {
     const onMouse = (e: MouseEvent) => {
       mx = e.clientX / window.innerWidth - 0.5
       my = e.clientY / window.innerHeight - 0.5
-    }
-    // Collapse on the first meaningful scroll: flip the CSS (display:none via the
-    // class) and remember it for the session. This shift is user-initiated, so it
-    // doesn't count toward CLS.
-    const onScroll = () => {
-      if (window.scrollY > 80) {
-        sessionStorage.setItem(SEEN_KEY, '1')
-        root.classList.add('hero-seen')
-        stop()
-      }
     }
     const tick = () => {
       const sp = Math.min(1, window.scrollY / (window.innerHeight * 0.75))
@@ -60,19 +39,16 @@ export function Hero() {
       }
       raf = requestAnimationFrame(tick)
     }
-    const stop = () => {
+    window.addEventListener('mousemove', onMouse)
+    raf = requestAnimationFrame(tick)
+    return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('mousemove', onMouse)
-      window.removeEventListener('scroll', onScroll)
     }
-    window.addEventListener('mousemove', onMouse)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    raf = requestAnimationFrame(tick)
-    return stop
   }, [])
 
   return (
-    <section className="hero-intro relative flex min-h-[58vh] flex-col items-center justify-center px-5 pb-10 pt-16 text-center">
+    <section className="relative flex min-h-[58vh] flex-col items-center justify-center px-5 pb-10 pt-16 text-center">
       <div
         ref={astroRef}
         className="relative mb-8 aspect-square w-[min(300px,68vw)] [transform-style:preserve-3d] [will-change:transform]"
