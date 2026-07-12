@@ -126,7 +126,7 @@ const DIE_CLASS: Record<'h' | 'o' | 'i', string> = {
 function Die({ kind, children }: { kind: 'h' | 'o' | 'i'; children: string }) {
   return (
     <span
-      className={`mx-0.5 inline-flex h-[21px] w-[21px] items-center justify-center rounded-[3px] border align-[-5px] text-[10.5px] ${DIE_CLASS[kind]}`}
+      className={`mx-0.5 inline-flex h-[21px] w-[21px] items-center justify-center rounded-[3px] border align-middle text-[10.5px] leading-none ${DIE_CLASS[kind]}`}
     >
       {children}
     </span>

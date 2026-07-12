@@ -18,6 +18,7 @@ export const Route = createRootRoute({
       },
     ],
     links: [
+      { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
       // Warm the Google Fonts connections before the CSS that references them is
       // parsed — this removes the DNS+TLS handshake from the LCP critical path.
       { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
