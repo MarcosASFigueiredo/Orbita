@@ -17,7 +17,7 @@ Durable context for humans and AI agents working on this repo. Keep this current
 
 Repo root `/home/archie/projects/orbita` (package `orbita`). It started as a
 **blank TanStack Start** (React) scaffold and now hosts **Orbita Suns VTT** — a
-companion web app for the tabletop RPG *"Orbita Suns: Crônica do Grande Eclipse"*
+companion web app for the tabletop RPG *"Orbita Suns: Crônica dos Seis Sóis"*
 (a modified Cthulhu Dark game). The scaffold/deploy history is below; the
 application architecture is in the next section.
 

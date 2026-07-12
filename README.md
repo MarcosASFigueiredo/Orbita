@@ -1,6 +1,6 @@
 # Orbita Suns VTT
 
-Companion web app for the tabletop RPG *"Orbita Suns: Crônica do Grande Eclipse"*.
+Companion web app for the tabletop RPG *"Orbita Suns: Crônica dos Seis Sóis"*.
 Stack: React 19 + TanStack Start, Postgres via Drizzle ORM, self-hosted Auth.js
 magic-link auth, SSE realtime. Production runs on Neon + Resend; local dev runs
 entirely on Docker with **no external accounts and no internet required**.

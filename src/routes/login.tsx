@@ -49,7 +49,7 @@ function LoginPage() {
       <div className="mb-8 text-center">
         <MoonStar className="mx-auto mb-4 text-[var(--color-sun)]" size={40} strokeWidth={1.5} />
         <p className="text-xs uppercase tracking-[0.24em] text-[var(--color-mist)]">
-          Crônica do Grande Eclipse
+          Crônica dos Seis Sóis
         </p>
         <h1 className="font-display text-4xl font-semibold text-[var(--color-starlight)]">
           Orbita Suns
