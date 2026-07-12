@@ -128,9 +128,11 @@ for PC and NPC** (restore returns a PC unowned — GM reassigns, keeping the 1:1
 (all server-only, no `VITE_` prefix). Without `AUTH_SECRET` the app degrades to
 the login screen; without `RESEND_API_KEY` in dev, the magic link is **printed to
 the server console** (`src/lib/mail.ts` fallback) so you can sign in offline.
-Drizzle scripts: `pnpm db:generate|migrate|push|studio|seed`, plus
-`db:seed:invites` (allowlist) and the Docker local-dev set (`db:up|down|reset`,
-`dev:setup`).
+Drizzle scripts: `pnpm db:generate|migrate|push|studio|seed` and the Docker
+local-dev set (`db:up|down|reset`, `dev:setup`). `db:seed` is **local-only**
+(hard-refuses any non-`db.localtest.me` DATABASE_URL): it seeds the characters +
+shared tracks + two `@lagash.local` test users. Staging/production are no longer
+seeded — real players are added by the GM from the in-app invite UI.
 
 **Multi-environment migrations:** `drizzle-kit migrate` targets whatever
 `DATABASE_URL` is set at run time and journals applied migrations **per-DB**
@@ -166,11 +168,10 @@ runtime keeps the `neon-http` driver over the pooler.
 **Next steps:** (1) **run `pnpm db:migrate` on every DB** (local done; staging/prod
 via `DOTENV_CONFIG_PATH=...` above) — migration `0002` adds `characters.deleted_at`
 + the `npcs` table; (2) set real `AUTH_SECRET`/`RESEND_API_KEY`/`EMAIL_FROM` in
-`.env` + Vercel and confirm real email delivery; (3) seed `invited_users` with the
-GM email (`db:seed:invites`) — the GM then invites players + creates/assigns sheets
-from the UI (no manual seed needed); (4) **decide the prod seed**: `db:seed` still
-inserts the 5 legacy fixed PCs — trim it to just the six-suns singleton + allowlist
-before seeding prod, or skip it; (5) verify the full feature live (invite email
+`.env` + Vercel and confirm real email delivery; (3) staging/production are **live
+and de-seeded** as of go-live (2026-07-12) — the GM allowlist row + Six Suns
+singleton are the only rows kept; players are invited from the in-app UI, and
+`db:seed` no longer runs against remote (it's local-only); (5) verify the full feature live (invite email
 round-trip, assignment, archive/restore, waiting room over SSE) — none verified
 in-session; (6) optional dice roller.
 

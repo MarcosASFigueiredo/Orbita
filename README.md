@@ -39,7 +39,7 @@ is **printed to the terminal running `pnpm dev`** instead of being emailed.
 3. Paste that URL into the browser — you're signed in.
 
 Only allowlisted emails may sign in (`invited_users` table). Add more via
-`pnpm db:studio` or by editing `src/server/db/seed-dev.ts`.
+`pnpm db:studio` or by editing the `DEV_INVITES` list in `src/server/db/seed.ts`.
 
 ### Why a "Neon proxy" container?
 
@@ -59,11 +59,12 @@ in your `.env`:
 | | `DATABASE_URL` | Email | Notes |
 |---|---|---|---|
 | **Local** | `postgres://…@db.localtest.me:5432/main` (default in `.env.example`) | magic link printed to terminal | safe to migrate/seed/reset freely |
-| **Production** | your Neon connection string | Resend (`RESEND_API_KEY`) | **never** run `db:migrate`/`db:seed` against it unless you mean to |
+| **Production** | your Neon connection string | Resend (`RESEND_API_KEY`) | **never** run `db:migrate` against it unless you mean to; `db:seed` is local-only and refuses to run here |
 
 `.env` is gitignored; only `.env.example` (placeholders, no secrets) is
-committed. `pnpm db:seed:dev` hard-refuses to run unless `DATABASE_URL` is the
-local host, so a stray reset can't touch Neon.
+committed. `pnpm db:seed` hard-refuses to run unless `DATABASE_URL` is the
+local host, so a stray seed/reset can't touch Neon. Real players are added by
+the GM from the in-app invite UI — staging/production are no longer seeded.
 
 ### Handy commands
 
@@ -72,8 +73,7 @@ pnpm db:up        # start Postgres + Neon proxy (waits until healthy)
 pnpm db:down      # stop the containers (keeps data)
 pnpm db:reset     # wipe the data volume and start fresh
 pnpm db:migrate   # apply drizzle/ migrations
-pnpm db:seed      # characters + shared tracks
-pnpm db:seed:dev  # local GM + Player test users (local-only)
+pnpm db:seed      # characters + shared tracks + local test users (local-only)
 pnpm db:studio    # Drizzle Studio (browse/edit the DB)
 ```
 
