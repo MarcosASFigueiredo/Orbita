@@ -137,6 +137,10 @@ export const characters = pgTable(
     insight: smallint('insight').notNull().default(0),
     insightLockedAt: timestamp('insight_locked_at', { withTimezone: true }),
     position: smallint('position').notNull().default(0),
+    // Soft delete: null = active, non-null = archived. Every PC read filters on
+    // `deleted_at IS NULL`; archiving also clears owner_user_id so the ex-owner
+    // falls back to the waiting screen. The GM can restore (set back to null).
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -146,6 +150,29 @@ export const characters = pgTable(
   },
   (t) => [check('characters_insight_range', sql`${t.insight} between 0 and 6`)],
 )
+
+// NPCs — GM-only prep entities. Deliberately a separate table from characters
+// (not a `kind` column) so an over-broad character read can never leak an NPC
+// to a Player session — the same defense-in-depth split used for Atrito. NPCs
+// have no Insight and no owner; faction/location are free text for now.
+export const npcs = pgTable('npcs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  nome: text('nome').notNull().default(''),
+  papel: text('papel').notNull().default(''),
+  descricao: text('descricao').notNull().default(''),
+  notas: text('notas').notNull().default(''),
+  faccao: text('faccao').notNull().default(''),
+  local: text('local').notNull().default(''),
+  position: smallint('position').notNull().default(0),
+  // Soft delete, mirrors characters: null = active, non-null = archived.
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})
 
 // Atrito — GM-only prep note. Separate table so an accidental over-broad read
 // still can't leak it (defense in depth, same as the old RLS split).

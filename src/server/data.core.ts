@@ -5,22 +5,37 @@
 // from the client bundle), and can be imported directly by tests.
 import '@tanstack/react-start/server-only'
 
-import { and, asc, eq, type InferSelectModel } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  eq,
+  isNotNull,
+  isNull,
+  ne,
+  sql,
+  type InferSelectModel,
+} from 'drizzle-orm'
 import { db } from '#/server/db/client'
 import {
   characterGmNotes,
   characters,
   legacyEntries,
   sixSunsState,
+  users,
 } from '#/server/db/schema'
 import { assertGm } from '#/server/session'
 import type { AuthUser } from '#/server/session'
+import { listInvites } from '#/server/invites.core'
+import { listNpcs } from '#/server/npcs.core'
+import { slugFromName } from '#/lib/character'
 import { INSIGHT_MAX, INSIGHT_MIN, SUN_COUNT } from '#/lib/game'
 import type {
   CharacterRow,
   CharacterSheetFields,
+  InviteRow,
   LegacyEntryRow,
   LegacyStatus,
+  NpcRow,
 } from '#/lib/game'
 
 // ---------------------------------------------------------------------------
@@ -59,6 +74,7 @@ function toCharacterRow(r: DbCharacter): CharacterRow {
     insight: r.insight,
     insight_locked_at: r.insightLockedAt?.toISOString() ?? null,
     position: r.position,
+    deleted_at: r.deletedAt?.toISOString() ?? null,
     created_at: r.createdAt.toISOString(),
     updated_at: r.updatedAt.toISOString(),
   }
@@ -106,10 +122,14 @@ export interface PlayerHomeData {
 
 export interface GmDashboardData {
   characters: CharacterRow[]
+  /** Soft-deleted PCs, for the roster's archive view. */
+  archivedCharacters: CharacterRow[]
   /** characterId -> Atrito text (GM-only). */
   atrito: Record<string, string>
   suns: boolean[]
   legacy: LegacyEntryRow[]
+  invites: InviteRow[]
+  npcs: NpcRow[]
 }
 
 // Player's own sheet (scoped to their assigned character slug) + shared tracks.
@@ -119,7 +139,9 @@ export async function getPlayerHome(user: AuthUser): Promise<PlayerHomeData> {
     const rows = await db
       .select()
       .from(characters)
-      .where(eq(characters.slug, user.characterSlug))
+      .where(
+        and(eq(characters.slug, user.characterSlug), isNull(characters.deletedAt)),
+      )
       .limit(1)
     character = rows[0] ? toCharacterRow(rows[0]) : null
   }
@@ -129,14 +151,32 @@ export async function getPlayerHome(user: AuthUser): Promise<PlayerHomeData> {
 // Everything the GM dashboard needs. GM only — Atrito is never read otherwise.
 export async function getGmDashboard(user: AuthUser): Promise<GmDashboardData> {
   assertGm(user)
-  const [chars, notes, tracks] = await Promise.all([
-    db.select().from(characters).orderBy(asc(characters.position)),
+  const [chars, archived, notes, tracks, invites, npcs] = await Promise.all([
+    db
+      .select()
+      .from(characters)
+      .where(isNull(characters.deletedAt))
+      .orderBy(asc(characters.position)),
+    db
+      .select()
+      .from(characters)
+      .where(isNotNull(characters.deletedAt))
+      .orderBy(asc(characters.position)),
     db.select().from(characterGmNotes),
     readSharedTracks(),
+    listInvites(user),
+    listNpcs(user),
   ])
   const atrito: Record<string, string> = {}
   for (const n of notes) atrito[n.characterId] = n.atrito
-  return { characters: chars.map(toCharacterRow), atrito, ...tracks }
+  return {
+    characters: chars.map(toCharacterRow),
+    archivedCharacters: archived.map(toCharacterRow),
+    atrito,
+    ...tracks,
+    invites,
+    npcs,
+  }
 }
 
 // ---- Mutations -------------------------------------------------------------
@@ -172,10 +212,13 @@ const SHEET_COLUMN = {
 // A player may only touch their own PC (by slug); the GM may touch any (by id).
 // Returns a WHERE that yields zero rows for an unauthorized target.
 function ownedCharacter(user: AuthUser, id: string) {
-  if (user.role === 'gm') return eq(characters.id, id)
+  if (user.role === 'gm') {
+    return and(eq(characters.id, id), isNull(characters.deletedAt))
+  }
   return and(
     eq(characters.id, id),
     eq(characters.slug, user.characterSlug ?? '\0'),
+    isNull(characters.deletedAt),
   )
 }
 
@@ -198,6 +241,107 @@ export async function saveCharacterFields(
     .where(ownedCharacter(user, input.id))
     .returning({ id: characters.id })
   return { ok: res.length > 0, error: res.length ? null : 'not_authorized' }
+}
+
+// GM-only: create a new PC sheet. Born with no owner (a valid, expected state
+// — the GM assigns it to a player later). Only `nome` is required; the rest is
+// filled in via the normal sheet editor. The slug is auto-generated + a random
+// suffix so it stays unique (ownership is tracked by owner_user_id, not slug).
+export async function createCharacter(
+  user: AuthUser,
+  input: { nome: string },
+): Promise<MutationResult & { character: CharacterRow | null }> {
+  assertGm(user)
+  const nome = input.nome.trim()
+  if (!nome) return { ok: false, error: 'nome_required', character: null }
+
+  const slug = `${slugFromName(nome)}-${crypto.randomUUID().slice(0, 8)}`
+  const [{ max: maxPos }] = await db
+    .select({ max: sql<number | null>`max(${characters.position})` })
+    .from(characters)
+  const position = (maxPos ?? -1) + 1
+
+  const [row] = await db
+    .insert(characters)
+    .values({ slug, nome, position })
+    .returning()
+  return { ok: true, error: null, character: row ? toCharacterRow(row) : null }
+}
+
+// GM-only: assign a PC to an accepted player, or unassign it (userId = null).
+// Enforces one PC per player: assigning first clears that player off any other
+// PC. The target must be an existing player account (accepted invite) — you
+// can't assign to a still-pending invite (no account exists yet).
+export async function assignCharacter(
+  user: AuthUser,
+  input: { characterId: string; userId: string | null },
+): Promise<MutationResult> {
+  assertGm(user)
+
+  if (input.userId === null) {
+    await db
+      .update(characters)
+      .set({ ownerUserId: null })
+      .where(
+        and(eq(characters.id, input.characterId), isNull(characters.deletedAt)),
+      )
+    return { ok: true, error: null }
+  }
+
+  const target = await db
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(eq(users.id, input.userId))
+    .limit(1)
+  if (!target.length) return { ok: false, error: 'user_not_found' }
+  if (target[0].role !== 'player') return { ok: false, error: 'not_a_player' }
+
+  // One PC per player: free the player from any other PC first.
+  await db
+    .update(characters)
+    .set({ ownerUserId: null })
+    .where(
+      and(
+        eq(characters.ownerUserId, input.userId),
+        ne(characters.id, input.characterId),
+      ),
+    )
+  const res = await db
+    .update(characters)
+    .set({ ownerUserId: input.userId })
+    .where(
+      and(eq(characters.id, input.characterId), isNull(characters.deletedAt)),
+    )
+    .returning({ id: characters.id })
+  return { ok: res.length > 0, error: res.length ? null : 'not_found' }
+}
+
+// GM-only: archive a PC (soft delete). Clears the owner so the ex-owner falls
+// back to the waiting screen. Reversible via restoreCharacter.
+export async function archiveCharacter(
+  user: AuthUser,
+  input: { id: string },
+): Promise<MutationResult> {
+  assertGm(user)
+  await db
+    .update(characters)
+    .set({ deletedAt: new Date(), ownerUserId: null })
+    .where(eq(characters.id, input.id))
+  return { ok: true, error: null }
+}
+
+// GM-only: restore an archived PC. It returns unowned (archiving cleared the
+// owner); the GM reassigns it — this keeps the one-PC-per-player rule intact.
+export async function restoreCharacter(
+  user: AuthUser,
+  input: { id: string },
+): Promise<MutationResult> {
+  assertGm(user)
+  await db
+    .update(characters)
+    .set({ deletedAt: null })
+    .where(eq(characters.id, input.id))
+  return { ok: true, error: null }
 }
 
 // Set a character's Insight (clamped 0–6). Players may edit their own; GM any.
@@ -231,7 +375,7 @@ export async function setCharacterLock(
   await db
     .update(characters)
     .set({ insightLockedAt: input.locked ? new Date() : null })
-    .where(eq(characters.id, input.id))
+    .where(and(eq(characters.id, input.id), isNull(characters.deletedAt)))
   return { ok: true, error: null }
 }
 

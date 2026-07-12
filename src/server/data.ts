@@ -5,18 +5,33 @@
 import { createServerFn } from '@tanstack/react-start'
 import { requireGm, requireUser } from '#/server/session'
 import {
+  archiveCharacter,
+  assignCharacter,
+  createCharacter,
   createLegacyEntry,
   editLegacyEntry,
   getGmDashboard,
   getPlayerHome,
   removeLegacyEntry,
+  restoreCharacter,
   saveAtrito,
   saveCharacterFields,
   setCharacterLock,
   setInsight,
   writeSuns,
 } from '#/server/data.core'
-import type { CharacterSheetFields, LegacyStatus } from '#/lib/game'
+import {
+  createInvite,
+  resendInvite,
+  revokeInvite,
+} from '#/server/invites.core'
+import {
+  archiveNpc,
+  createNpc,
+  editNpc,
+  restoreNpc,
+} from '#/server/npcs.core'
+import type { CharacterSheetFields, LegacyStatus, NpcFields } from '#/lib/game'
 
 export type { PlayerHomeData, GmDashboardData } from '#/server/data.core'
 
@@ -31,6 +46,22 @@ export const fetchGmDashboard = createServerFn({ method: 'GET' }).handler(
 )
 
 // ---- Mutations -------------------------------------------------------------
+
+export const createCharacterSheet = createServerFn({ method: 'POST' })
+  .validator((input: { nome: string }) => input)
+  .handler(async ({ data }) => createCharacter(await requireGm(), data))
+
+export const assignCharacterOwner = createServerFn({ method: 'POST' })
+  .validator((input: { characterId: string; userId: string | null }) => input)
+  .handler(async ({ data }) => assignCharacter(await requireGm(), data))
+
+export const archiveCharacterSheet = createServerFn({ method: 'POST' })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => archiveCharacter(await requireGm(), data))
+
+export const restoreCharacterSheet = createServerFn({ method: 'POST' })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => restoreCharacter(await requireGm(), data))
 
 export const updateCharacterFields = createServerFn({ method: 'POST' })
   .validator((input: { id: string; fields: Partial<CharacterSheetFields> }) => input)
@@ -63,3 +94,35 @@ export const updateLegacyEntry = createServerFn({ method: 'POST' })
 export const deleteLegacyEntry = createServerFn({ method: 'POST' })
   .validator((input: { id: string }) => input)
   .handler(async ({ data }) => removeLegacyEntry(await requireGm(), data))
+
+// ---- Invites (GM-only) -----------------------------------------------------
+
+export const invitePlayer = createServerFn({ method: 'POST' })
+  .validator((input: { email: string; displayName?: string }) => input)
+  .handler(async ({ data }) => createInvite(await requireGm(), data))
+
+export const resendPlayerInvite = createServerFn({ method: 'POST' })
+  .validator((input: { email: string }) => input)
+  .handler(async ({ data }) => resendInvite(await requireGm(), data))
+
+export const revokePlayerInvite = createServerFn({ method: 'POST' })
+  .validator((input: { email: string }) => input)
+  .handler(async ({ data }) => revokeInvite(await requireGm(), data))
+
+// ---- NPCs (GM-only) --------------------------------------------------------
+
+export const createNpcSheet = createServerFn({ method: 'POST' })
+  .validator((input: Partial<NpcFields> & { nome: string }) => input)
+  .handler(async ({ data }) => createNpc(await requireGm(), data))
+
+export const updateNpc = createServerFn({ method: 'POST' })
+  .validator((input: { id: string; fields: Partial<NpcFields> }) => input)
+  .handler(async ({ data }) => editNpc(await requireGm(), data))
+
+export const archiveNpcSheet = createServerFn({ method: 'POST' })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => archiveNpc(await requireGm(), data))
+
+export const restoreNpcSheet = createServerFn({ method: 'POST' })
+  .validator((input: { id: string }) => input)
+  .handler(async ({ data }) => restoreNpc(await requireGm(), data))

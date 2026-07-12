@@ -1,18 +1,33 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { TriangleAlert } from "lucide-react";
+import type { PlayerOption } from "#/components/lagash/AssignOwner";
 import { CharacterDetail } from "#/components/lagash/CharacterDetail";
+import { InvitePanel } from "#/components/lagash/InvitePanel";
 import { LegacyTrack } from "#/components/lagash/LegacyTrack";
+import { NpcPanel } from "#/components/lagash/NpcPanel";
 import { Roster } from "#/components/lagash/Roster";
 import { SunsClock } from "#/components/lagash/SunsClock";
 import { useLagashRealtime } from "#/lib/realtime";
 import { useOptimisticData } from "#/lib/optimistic";
+import { requestMagicLink } from "#/lib/auth-client";
 import {
   addLegacyEntry,
+  archiveCharacterSheet,
+  archiveNpcSheet,
+  assignCharacterOwner,
+  createCharacterSheet,
+  createNpcSheet,
   deleteLegacyEntry,
   fetchGmDashboard,
+  invitePlayer,
   lockCharacter,
+  resendPlayerInvite,
+  restoreCharacterSheet,
+  restoreNpcSheet,
+  revokePlayerInvite,
   setSuns,
+  updateNpc,
   updateAtrito,
   updateCharacterFields,
   updateInsight,
@@ -23,6 +38,7 @@ import type {
   CharacterSheetFields,
   LegacyEntryRow,
   LegacyStatus,
+  NpcFields,
 } from "#/lib/game";
 
 export const Route = createFileRoute("/_app/gm")({
@@ -50,10 +66,108 @@ function tempLegacy(texto: string, position: number): LegacyEntryRow {
 }
 
 function GmDashboard() {
+  const router = useRouter();
   const [data, mutate] = useOptimisticData(Route.useLoaderData());
-  const { characters, atrito, suns, legacy } = data;
+  const { characters, archivedCharacters, atrito, suns, legacy, invites, npcs } =
+    data;
   const [picked, setPicked] = useState<string | null>(null);
   useLagashRealtime();
+
+  // Accepted players (a magic-link login created their account) are the only
+  // valid assignment targets. Build the owner-name map + assignment options,
+  // including each player's currently-owned PC so the assign UI can warn on a
+  // swap (one PC per player).
+  const accepted = invites.filter((i) => i.status === "accepted" && i.user_id);
+  const owners: Record<string, string> = {};
+  for (const inv of accepted) {
+    if (inv.user_id) owners[inv.user_id] = inv.display_name || inv.email;
+  }
+  const players: PlayerOption[] = accepted.map((inv) => ({
+    userId: inv.user_id as string,
+    displayName: inv.display_name || inv.email,
+    ownsCharacterId: inv.assigned_character?.id ?? null,
+    ownsCharacterNome: inv.assigned_character?.nome ?? null,
+  }));
+
+  // Invites live outside the optimistic overlay: they aren't in the SSE feed,
+  // so each action persists then forces a loader refetch to reflect the derived
+  // status. The magic link reuses the exact Auth.js/Resend path as /login.
+  const onInvite = async (email: string, displayName: string) => {
+    const res = await invitePlayer({ data: { email, displayName } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await requestMagicLink(email);
+    await router.invalidate();
+  };
+
+  const onResendInvite = async (email: string) => {
+    const res = await resendPlayerInvite({ data: { email } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    // Server invalidated the old link; mint a fresh one via the same path.
+    await requestMagicLink(email);
+    await router.invalidate();
+  };
+
+  const onRevokeInvite = async (email: string) => {
+    const res = await revokePlayerInvite({ data: { email } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await router.invalidate();
+  };
+
+  // Create a PC (GM-only). Await the real row, refetch, then select it so the
+  // GM lands in the detail editor to fill the rest of the sheet.
+  const onCreateCharacter = async (nome: string) => {
+    const res = await createCharacterSheet({ data: { nome } });
+    if (!res.ok || !res.character) throw new Error(res.error ?? "error");
+    await router.invalidate();
+    setPicked(res.character.id);
+  };
+
+  // Assignment / archive of PCs: persist then refetch (owner + archive state
+  // aren't part of the optimistic sheet overlay).
+  const onAssign = async (characterId: string, userId: string | null) => {
+    const res = await assignCharacterOwner({ data: { characterId, userId } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await router.invalidate();
+  };
+
+  const onArchiveCharacter = async (id: string) => {
+    const res = await archiveCharacterSheet({ data: { id } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    setPicked(null);
+    await router.invalidate();
+  };
+
+  const onRestoreCharacter = async (id: string) => {
+    const res = await restoreCharacterSheet({ data: { id } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await router.invalidate();
+  };
+
+  // NPCs, like invites, live outside the optimistic overlay (not in the SSE
+  // feed): persist then refetch.
+  const onCreateNpc = async (fields: NpcFields) => {
+    const res = await createNpcSheet({ data: fields });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await router.invalidate();
+  };
+
+  const onEditNpc = async (id: string, fields: Partial<NpcFields>) => {
+    const res = await updateNpc({ data: { id, fields } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await router.invalidate();
+  };
+
+  const onArchiveNpc = async (id: string) => {
+    const res = await archiveNpcSheet({ data: { id } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await router.invalidate();
+  };
+
+  const onRestoreNpc = async (id: string) => {
+    const res = await restoreNpcSheet({ data: { id } });
+    if (!res.ok) throw new Error(res.error ?? "error");
+    await router.invalidate();
+  };
 
   // Default the detail pane to the first character; keep the caller's pick when
   // it still exists (survives realtime list changes).
@@ -169,20 +283,40 @@ function GmDashboard() {
       )}
 
       <div className="grid items-start gap-5 min-[1150px]:grid-cols-[288px_1fr_320px]">
-        <Roster
-          characters={characters}
-          selectedId={selected?.id ?? null}
-          onSelect={setPicked}
-        />
+        <div className="flex flex-col gap-5">
+          <InvitePanel
+            invites={invites}
+            onInvite={onInvite}
+            onResend={onResendInvite}
+            onRevoke={onRevokeInvite}
+          />
+          <Roster
+            characters={characters}
+            archivedCharacters={archivedCharacters}
+            owners={owners}
+            selectedId={selected?.id ?? null}
+            onSelect={setPicked}
+            onCreate={onCreateCharacter}
+            onRestore={onRestoreCharacter}
+          />
+        </div>
 
         {selected ? (
           <CharacterDetail
             character={selected}
             atrito={atrito[selected.id] ?? ""}
             locked={selected.insight_locked_at !== null}
+            ownerName={
+              selected.owner_user_id
+                ? (owners[selected.owner_user_id] ?? "Jogador")
+                : null
+            }
+            players={players}
             onSaveField={(field, value) => onSaveField(selected.id, field, value)}
             onInsight={(value) => onInsight(selected.id, value)}
             onSaveAtrito={(value) => onSaveAtrito(selected.id, value)}
+            onAssign={(userId) => onAssign(selected.id, userId)}
+            onArchive={() => onArchiveCharacter(selected.id)}
           />
         ) : (
           <div className="plate p-6 text-center font-serif italic text-[var(--color-text-3)]">
@@ -206,6 +340,16 @@ function GmDashboard() {
           </section>
         </div>
       </div>
+
+      <section className="mt-5">
+        <NpcPanel
+          npcs={npcs}
+          onCreate={onCreateNpc}
+          onEdit={onEditNpc}
+          onArchive={onArchiveNpc}
+          onRestore={onRestoreNpc}
+        />
+      </section>
     </main>
   );
 }

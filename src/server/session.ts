@@ -8,7 +8,7 @@ import "@tanstack/react-start/server-only";
 
 import { redirect } from "@tanstack/react-router";
 import { getRequest } from "@tanstack/react-start/server";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "#/server/db/client";
 import { characters, users } from "#/server/db/schema";
 import { authSession } from "#/server/auth/config";
@@ -43,7 +43,10 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
       slug: characters.slug,
     })
     .from(users)
-    .leftJoin(characters, eq(characters.ownerUserId, users.id))
+    .leftJoin(
+      characters,
+      and(eq(characters.ownerUserId, users.id), isNull(characters.deletedAt)),
+    )
     .where(eq(users.id, userId))
     .limit(1);
   const row = rows[0];

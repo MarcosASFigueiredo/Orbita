@@ -3,6 +3,7 @@ import { Codex } from "#/components/lagash/Codex";
 import { LegacyTrack } from "#/components/lagash/LegacyTrack";
 import { MobileDock } from "#/components/lagash/MobileDock";
 import { SunsClock } from "#/components/lagash/SunsClock";
+import { WaitingRoom } from "#/components/lagash/WaitingRoom";
 import { useLagashRealtime } from "#/lib/realtime";
 import { useOptimisticData } from "#/lib/optimistic";
 import { fetchPlayerHome, updateInsight } from "#/server/data";
@@ -18,18 +19,13 @@ export const Route = createFileRoute("/_app/")({
 });
 
 function PlayerHome() {
+  const { user } = Route.useRouteContext();
   const [data, mutate] = useOptimisticData(Route.useLoaderData());
   const { character, suns, legacy } = data;
   useLagashRealtime();
 
   if (!character) {
-    return (
-      <main className="mx-auto max-w-2xl px-4 py-6">
-        <p className="plate p-6 text-[var(--color-text-2)]">
-          Nenhuma ficha atribuída a você ainda. Fale com o Mestre.
-        </p>
-      </main>
-    );
+    return <WaitingRoom displayName={user.displayName} />;
   }
 
   const characterId = character.id;

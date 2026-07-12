@@ -1,5 +1,7 @@
-import { Lock } from 'lucide-react'
+import { useState } from 'react'
+import { Archive, Lock } from 'lucide-react'
 import { AutoField } from './AutoField'
+import { AssignOwner, type PlayerOption } from './AssignOwner'
 import { InsightDial } from './InsightDial'
 import { insightColor, insightPhase } from '#/lib/insight'
 import { INSIGHT_MAX, INSIGHT_MIN } from '#/lib/game'
@@ -13,18 +15,27 @@ export function CharacterDetail({
   character,
   atrito,
   locked,
+  ownerName,
+  players,
   onSaveField,
   onInsight,
   onSaveAtrito,
+  onAssign,
+  onArchive,
 }: {
   character: CharacterRow
   atrito: string
   locked: boolean
+  ownerName: string | null
+  players: PlayerOption[]
   onSaveField: (field: keyof CharacterSheetFields, value: string) => void
   onInsight: (value: number) => void
   onSaveAtrito: (value: string) => void
+  onAssign: (userId: string | null) => Promise<void>
+  onArchive: () => Promise<void>
 }) {
   const col = insightColor(character.insight)
+  const [archiving, setArchiving] = useState(false)
   const step = (delta: number) =>
     onInsight(Math.max(INSIGHT_MIN, Math.min(INSIGHT_MAX, character.insight + delta)))
 
@@ -50,6 +61,16 @@ export function CharacterDetail({
             Insight
           </p>
         </div>
+      </div>
+
+      <div className="mt-5">
+        <AssignOwner
+          characterId={character.id}
+          ownerId={character.owner_user_id}
+          ownerName={ownerName}
+          players={players}
+          onAssign={onAssign}
+        />
       </div>
 
       <div className="my-6 flex items-center justify-center gap-3.5 rounded-sm border border-[var(--color-vein)] bg-[rgba(5,5,7,0.5)] p-3.5">
@@ -104,6 +125,25 @@ export function CharacterDetail({
             </span>
           </div>
           <AutoField label="" value={atrito} onSave={onSaveAtrito} multiline />
+        </div>
+
+        <div className="mt-1 flex justify-end">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-[var(--color-text-3)] transition-colors hover:text-[var(--color-crimson)] disabled:opacity-45"
+            disabled={archiving}
+            onClick={async () => {
+              setArchiving(true)
+              try {
+                await onArchive()
+              } finally {
+                setArchiving(false)
+              }
+            }}
+          >
+            <Archive size={12} />
+            {archiving ? 'Arquivando…' : 'Arquivar ficha'}
+          </button>
         </div>
       </div>
     </div>
