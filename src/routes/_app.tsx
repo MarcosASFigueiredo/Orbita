@@ -20,10 +20,9 @@ export const Route = createFileRoute("/_app")({
     if (!user) {
       throw redirect({ to: "/login", search: { erro: undefined } });
     }
-    // Logged in but not on the allowlist (no role match / no assigned PC).
-    if (user.role === "player" && !user.characterSlug) {
-      throw redirect({ to: "/login", search: { erro: "nao_convidado" } });
-    }
+    // A resolved user is already past the Auth.js allowlist gate (no invite,
+    // no session). A player without an assigned PC is a valid, expected state —
+    // they land on the waiting room (src/routes/_app/index.tsx), not an error.
     return { user };
   },
   component: AppLayout,

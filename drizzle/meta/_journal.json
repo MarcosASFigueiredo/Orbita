@@ -15,6 +15,13 @@
       "when": 1783601988023,
       "tag": "0001_updated_at_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783803590049,
+      "tag": "0002_oval_lionheart",
+      "breakpoints": true
     }
   ]
 }

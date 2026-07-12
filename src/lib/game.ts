@@ -30,8 +30,51 @@ export type CharacterRow = CharacterSheetFields & {
   insight: number
   insight_locked_at: string | null
   position: number
+  /** Soft delete: null = active, ISO string = archived. */
+  deleted_at: string | null
   created_at: string
   updated_at: string
+}
+
+/** GM-only NPC prep sheet. Never returned by any Player-facing function. */
+export type NpcRow = {
+  id: string
+  nome: string
+  papel: string
+  descricao: string
+  notas: string
+  faccao: string
+  local: string
+  position: number
+  /** Soft delete: null = active, ISO string = archived. */
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Editable NPC fields (pt-BR). `nome` is the only required one on create. */
+export type NpcFields = {
+  nome: string
+  papel: string
+  descricao: string
+  notas: string
+  faccao: string
+  local: string
+}
+
+/** A table invite as the GM roster sees it. Status is derived, not stored. */
+export type InviteStatus = 'pending' | 'accepted'
+
+export type InviteRow = {
+  email: string
+  display_name: string
+  role: AppRole
+  status: InviteStatus
+  /** The user id once accepted (first sign-in created the account); else null. */
+  user_id: string | null
+  /** The PC currently assigned to this accepted user, if any. */
+  assigned_character: { id: string; nome: string } | null
+  created_at: string
 }
 
 export type LegacyEntryRow = {
