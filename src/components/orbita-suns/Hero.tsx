@@ -71,8 +71,6 @@ export function Hero() {
           </g>
           <g className="hero-ring-fast" fill="none" stroke="rgba(93,90,158,0.4)">
             <circle cx="200" cy="200" r="112" strokeWidth="0.5" strokeDasharray="2 10" />
-            <polygon points="200,110 278,245 122,245" strokeWidth="0.45" opacity="0.7" />
-            <polygon points="200,290 122,155 278,155" strokeWidth="0.45" opacity="0.7" />
           </g>
           <circle className="hero-corona" cx="200" cy="200" r="76" fill="url(#heroCorona)" />
           <circle cx="200" cy="200" r="46" fill="#07070c" />

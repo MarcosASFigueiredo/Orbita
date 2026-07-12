@@ -86,14 +86,14 @@ export function LegacyTrack({
               </div>
 
               {editable && onSetStatus ? (
-                <div className="mt-2 flex gap-1.5">
+                <div className="mt-2 flex flex-wrap gap-1.5">
                   {STATUS_ORDER.map((status) => {
                     const active = entry.status === status
                     return (
                       <button
                         key={status}
                         type="button"
-                        className="btn px-2.5 py-1 text-xs"
+                        className="btn whitespace-nowrap px-2.5 py-1 text-xs"
                         style={
                           active
                             ? {
