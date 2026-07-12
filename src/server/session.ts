@@ -24,12 +24,36 @@ export interface AuthUser {
   characterSlug: string | null;
 }
 
+// Per-request identity cache. A single page load resolves "who is calling"
+// several times — the `/_app` beforeLoad guard and the route loader each ask —
+// and every resolution otherwise re-runs the Auth.js session read (~220ms: an
+// Auth() handler spin-up + session/user DB queries). Keying on the request
+// object (stable for the request's lifetime) collapses those to one resolution
+// and lets the entry be GC'd the moment the request ends, so nothing leaks
+// across requests or between users. Each new HTTP request still re-authenticates
+// from scratch — this only dedupes within one request.
+const currentUserByRequest = new WeakMap<Request, Promise<AuthUser | null>>();
+
 // Resolve the current user from the request session. Returns null when not
 // logged in (or before AUTH_SECRET is configured — the app then degrades to the
-// login screen instead of throwing).
-export async function getCurrentUser(): Promise<AuthUser | null> {
+// login screen instead of throwing). Memoized per request (see above).
+export function getCurrentUser(): Promise<AuthUser | null> {
+  const request = getRequest();
+  // Defensive: outside a request context (no object to key on) resolve directly.
+  if (!request) return resolveCurrentUser(undefined);
+  let cached = currentUserByRequest.get(request);
+  if (!cached) {
+    cached = resolveCurrentUser(request);
+    currentUserByRequest.set(request, cached);
+  }
+  return cached;
+}
+
+async function resolveCurrentUser(
+  request: Request | undefined,
+): Promise<AuthUser | null> {
   if (!process.env.AUTH_SECRET) return null;
-  const session = await authSession(getRequest());
+  const session = await authSession(request ?? getRequest());
   const userId = session?.user?.id;
   if (!userId) return null;
 

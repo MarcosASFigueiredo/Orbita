@@ -36,7 +36,10 @@ function AppLayout() {
     <>
       <Cosmos />
       <Nav role={user.role} displayName={user.displayName} />
-      <div className="relative z-10 pt-[60px]">
+      {/* Reserve the viewport height up front so the route content (streamed in
+          after the loader/auth resolves) fills a space that already exists — the
+          <main> no longer grows from 0×0, which was ~all of the page CLS. */}
+      <div className="relative z-10 min-h-[100dvh] pt-[60px]">
         <Hero />
         <Outlet />
       </div>
