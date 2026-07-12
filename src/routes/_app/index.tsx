@@ -6,7 +6,7 @@ import { SunsClock } from "#/components/orbita-suns/SunsClock";
 import { WaitingRoom } from "#/components/orbita-suns/WaitingRoom";
 import { useRealtime } from "#/lib/realtime";
 import { useOptimisticData } from "#/lib/optimistic";
-import { fetchPlayerHome, updateInsight } from "#/server/data";
+import { fetchPlayerHome } from "#/server/data";
 
 export const Route = createFileRoute("/_app/")({
   beforeLoad: ({ context }) => {
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/_app/")({
 
 function PlayerHome() {
   const { user } = Route.useRouteContext();
-  const [data, mutate] = useOptimisticData(Route.useLoaderData());
+  const [data] = useOptimisticData(Route.useLoaderData());
   const { character, suns, legacy } = data;
   useRealtime();
 
@@ -28,25 +28,15 @@ function PlayerHome() {
     return <WaitingRoom displayName={user.displayName} />;
   }
 
-  const characterId = character.id;
+  // The whole sheet is read-only for players now — the GM authors the text and
+  // controls Insight. Updates arrive live over SSE (useRealtime).
   const locked = character.insight_locked_at !== null;
-
-  // Player self-edits only their own Insight (the Insanity die). Optimistic so
-  // it feels instant; the sheet text is read-only (the GM authors it).
-  const onInsight = (value: number) =>
-    mutate(
-      (d) => ({
-        ...d,
-        character: d.character ? { ...d.character, insight: value } : d.character,
-      }),
-      () => updateInsight({ data: { id: characterId, insight: value } }),
-    );
 
   return (
     <>
       <main className="mx-auto max-w-[880px] px-4 py-6 pb-28 sm:px-6 min-[720px]:pb-8">
         <div id="ficha" className="scroll-mt-20">
-          <Codex character={character} locked={locked} onInsight={onInsight} />
+          <Codex character={character} locked={locked} />
         </div>
 
         <div className="mt-5 grid gap-5 min-[840px]:grid-cols-2">

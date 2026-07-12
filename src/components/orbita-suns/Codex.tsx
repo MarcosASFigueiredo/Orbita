@@ -1,25 +1,18 @@
-import { Minus, Plus } from 'lucide-react'
 import { InsightConstellation } from './InsightConstellation'
 import { insightColor, insightPhase } from '#/lib/insight'
-import { INSIGHT_MAX, INSIGHT_MIN } from '#/lib/game'
 import type { CharacterRow } from '#/lib/game'
 
-// The player's character sheet as a read-only codex (the GM authors the text in
-// the dashboard). The one thing the player writes here is their own Insight —
-// the Insanity die can raise it mid-scene — via the −/+ controls, which darken
-// the suns of their inner-sky constellation.
+// The player's character sheet as a fully read-only codex — the GM authors the
+// text and now controls Insight too (players no longer self-edit it). The
+// inner-sky constellation still darkens as Insight rises, driven by the GM.
 export function Codex({
   character,
   locked,
-  onInsight,
 }: {
   character: CharacterRow
   locked: boolean
-  onInsight: (value: number) => void
 }) {
   const col = insightColor(character.insight)
-  const step = (delta: number) =>
-    onInsight(Math.max(INSIGHT_MIN, Math.min(INSIGHT_MAX, character.insight + delta)))
 
   return (
     <div className="plate reveal tiltable overflow-hidden">
@@ -57,29 +50,11 @@ export function Codex({
         </div>
         <div className="mb-3 rounded-sm border border-[var(--color-vein)] bg-[rgba(5,5,7,0.5)] px-4 py-6">
           <InsightConstellation insight={character.insight} />
-          <div className="mt-5 flex items-center justify-center gap-5">
-            <button
-              type="button"
-              className="btn h-9 w-9 shrink-0 px-0"
-              disabled={locked || character.insight <= INSIGHT_MIN}
-              onClick={() => step(-1)}
-              aria-label="Diminuir Insight"
-            >
-              <Minus size={15} />
-            </button>
+          <div className="mt-5 flex items-center justify-center">
             <span className="font-serif text-lg" style={{ color: col }}>
               Insight {character.insight}
               <span className="text-[var(--color-text-3)]">/6</span>
             </span>
-            <button
-              type="button"
-              className="btn h-9 w-9 shrink-0 px-0"
-              disabled={locked || character.insight >= INSIGHT_MAX}
-              onClick={() => step(1)}
-              aria-label="Aumentar Insight"
-            >
-              <Plus size={15} />
-            </button>
           </div>
         </div>
         {locked && (
