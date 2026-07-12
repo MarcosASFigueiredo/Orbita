@@ -26,6 +26,7 @@
   --color-gold-dim: rgba(201, 165, 88, 0.35);
   --color-gold-faint: rgba(201, 165, 88, 0.12);
   --color-indigo: #5d5a9e;
+  --color-indigo-bright: #9a96dd;
   --color-crimson: #b34a6a;
   --color-crimson-soft: #c76a55;
   --color-crimson-deep: #7c2a45;
@@ -397,6 +398,19 @@ a {
 }
 .sun-label.dead {
   fill: var(--color-text-3);
+}
+
+/* The Insight constellation (the player's inner sky) recolors its lit suns to
+   indigo so it's never mistaken for the world's gold Six Suns. Dead suns stay
+   dark for both; only the lit hue + halo change. Transition flares use the
+   indigo palette in src/lib/sun-fx.ts (INSIGHT_PALETTE). */
+.insight-sky .sun-core.lit {
+  fill: var(--color-indigo-bright);
+  stroke: var(--color-indigo);
+  filter: drop-shadow(0 0 6px rgba(125, 120, 215, 0.7));
+}
+.insight-sky .sun-halo {
+  fill: rgba(125, 120, 215, 0.16);
 }
 
 /* Insight constellation: the figure comes apart as suns die (line between two

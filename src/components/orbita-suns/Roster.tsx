@@ -99,7 +99,11 @@ export function Roster({
               className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-3)]"
             />
             <input
-              className="field-input pl-8"
+              // .field-input is unlayered, so its `padding` shorthand beats the
+              // Tailwind `pl-*` utility (layered) — set the icon gap inline so it
+              // actually wins and the lupa never overlaps the placeholder.
+              className="field-input"
+              style={{ paddingLeft: '2rem' }}
               placeholder="Buscar nome ou ofício"
               value={term}
               onChange={(e) => setTerm(e.target.value)}

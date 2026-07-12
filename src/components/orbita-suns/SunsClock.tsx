@@ -22,7 +22,9 @@ import { applySunFx } from '#/lib/sun-fx'
 
 const CX = 200
 const CY = 200
-const R = 132
+// Sun orbit radius — matches the dashed orbit ring (suns-ring-b, r=150) so the
+// suns ride on top of that line rather than floating inside it.
+const R = 150
 const LABEL_OFFSET = 16
 const ORBIT_MS = 48_000
 
@@ -30,8 +32,6 @@ const SUNS = Array.from({ length: SUN_COUNT }, (_, i) => {
   const a = -Math.PI / 2 + (i * Math.PI) / 3
   return { x: CX + Math.cos(a) * R, y: CY + Math.sin(a) * R }
 })
-const hex = (idx: number[]) => idx.map((i) => `${SUNS[i].x},${SUNS[i].y}`).join(' ')
-
 const Skeleton = memo(
   function Skeleton({
     editable,
@@ -63,8 +63,6 @@ const Skeleton = memo(
         <circle cx="200" cy="200" r="38" fill="none" stroke="var(--color-gold-faint)" strokeWidth="0.6" />
 
         <g data-orbit>
-          <polygon points={hex([0, 2, 4])} fill="none" stroke="rgba(93,90,158,0.28)" strokeWidth="0.5" />
-          <polygon points={hex([1, 3, 5])} fill="none" stroke="rgba(93,90,158,0.28)" strokeWidth="0.5" />
           {SUNS.map((p, i) => (
             <g key={i} data-sun={i} style={{ cursor: editable ? 'pointer' : 'default' }}>
               <circle

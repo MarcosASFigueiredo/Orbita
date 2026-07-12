@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef } from 'react'
 import { SUN_COUNT } from '#/lib/game'
-import { SUN_NAMES, sunTransition, type SunState } from '#/lib/suns'
-import { applySunFx } from '#/lib/sun-fx'
+import { sunTransition, type SunState } from '#/lib/suns'
+import { applySunFx, INSIGHT_PALETTE } from '#/lib/sun-fx'
 
 // The player's Insight as the constellation of their inner sky — a personal
 // mirror of the Six Suns clock. Insight N = N suns dead, dying in order, so the
@@ -43,7 +43,7 @@ const Skeleton = memo(
     const lit = insightToLit(initialInsight)
     return (
       <svg viewBox="0 0 320 190" className="h-auto w-full overflow-visible">
-        <g fill="var(--color-gold-faint)">
+        <g fill="rgba(125,120,215,0.16)">
           {BG_STARS.map((s, i) => (
             <circle key={i} cx={s.x} cy={s.y} r={s.r} />
           ))}
@@ -60,43 +60,30 @@ const Skeleton = memo(
               y1={p.y}
               x2={q.x}
               y2={q.y}
-              stroke="rgba(201,165,88,0.4)"
+              stroke="rgba(125,120,215,0.4)"
               strokeWidth="0.8"
               style={{ opacity: lineOpacity(i, initialInsight) }}
             />
           )
         })}
 
-        {POS.map((p, i) => {
-          const below = p.y <= 95
-          return (
-            <g key={i} data-sun={i}>
-              <circle
-                className={`sun-halo${lit[i] ? ' lit' : ''}`}
-                cx={p.x}
-                cy={p.y}
-                r="12"
-              />
-              <circle
-                className={`sun-core ${lit[i] ? 'lit' : 'dead'}`}
-                cx={p.x}
-                cy={p.y}
-                r="6"
-                strokeWidth="1"
-              />
-              <text
-                className={`sun-label ${lit[i] ? 'lit' : 'dead'}`}
-                x={p.x}
-                y={below ? p.y + 18 : p.y - 12}
-                textAnchor="middle"
-                fontFamily="Inter, sans-serif"
-                fontSize="8"
-              >
-                {SUN_NAMES[i]}
-              </text>
-            </g>
-          )
-        })}
+        {POS.map((p, i) => (
+          <g key={i} data-sun={i}>
+            <circle
+              className={`sun-halo${lit[i] ? ' lit' : ''}`}
+              cx={p.x}
+              cy={p.y}
+              r="12"
+            />
+            <circle
+              className={`sun-core ${lit[i] ? 'lit' : 'dead'}`}
+              cx={p.x}
+              cy={p.y}
+              r="6"
+              strokeWidth="1"
+            />
+          </g>
+        ))}
       </svg>
     )
   },
@@ -122,8 +109,8 @@ export function InsightConstellation({ insight }: { insight: number }) {
       const g = root.querySelector(`[data-sun="${i}"]`)
       const core = g?.querySelector('.sun-core') as SVGElement | null
       const halo = g?.querySelector('.sun-halo') as SVGElement | null
-      const label = g?.querySelector('.sun-label') as SVGElement | null
-      if (core && halo) applySunFx({ core, halo, label }, st, reduce, animsRef.current, String(i))
+      if (core && halo)
+        applySunFx({ core, halo }, st, reduce, animsRef.current, String(i), INSIGHT_PALETTE)
     })
 
     root.querySelectorAll('[data-line]').forEach((ln) => {
@@ -135,7 +122,7 @@ export function InsightConstellation({ insight }: { insight: number }) {
   }, [insight])
 
   return (
-    <div ref={rootRef} className="mx-auto w-full max-w-[340px]">
+    <div ref={rootRef} className="insight-sky mx-auto w-full max-w-[340px]">
       <Skeleton initialInsight={insight} />
     </div>
   )
